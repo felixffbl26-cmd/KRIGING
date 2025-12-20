@@ -303,7 +303,7 @@ with st.sidebar:
     st.markdown("## 🏗️ PANEL DE CONTROL")
     st.markdown("---")
     st.markdown("**📁 Proyecto:** POMPERIA S.A.C.")
-    st.markdown("**👷 Ingeniero:** Felix Bautista Layme")
+    st.markdown("**👷 Estudiante:** Felix Bautista Layme")
     st.markdown("**📅 Fecha:** " + datetime.now().strftime("%d/%m/%Y"))
     
     st.markdown("---")
@@ -703,7 +703,7 @@ with tabs[6]:
             <table style="width:100%; margin-bottom:20px;">
                 <tr>
                     <td><b>Fecha:</b> {fecha}</td>
-                    <td style="text-align:right;"><b>Auditor:</b> Felix Bautista Layme</td>
+                    <td style="text-align:right;"><b>estudiante:</b> Felix Bautista Layme</td>
                 </tr>
             </table>
             
@@ -742,7 +742,7 @@ with tabs[6]:
             <br><br><br>
             <div style="text-align:center;">
                 <p>__________________________</p>
-                <p><b>Ing. Felix Bautista Layme</b><br>Firma del Responsable</p>
+                <p><b>Felix Bautista Layme</b><br>Firma del Responsable</p>
             </div>
         </div>
         """
@@ -750,4 +750,5 @@ with tabs[6]:
         st.components.v1.html(reporte_html, height=800, scrolling=True)
         b64 = base64.b64encode(reporte_html.encode()).decode()
         href = f'<a href="data:text/html;base64,{b64}" download="Informe_Tecnico_Oficial.html"><button style="background:#d32f2f; color:white; padding:12px 25px; border:none; border-radius:5px; cursor:pointer; font-size:1.1em; margin-top:10px;">📥 DESCARGAR INFORME OFICIAL (PDF)</button></a>'
+
         st.markdown(href, unsafe_allow_html=True)
