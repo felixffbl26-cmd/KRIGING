@@ -552,7 +552,8 @@ with tabs[3]:
             'Peso (λ)': pesos_calc,
             'Aporte (%)': aportes
         })
-        st.dataframe(df_w.style.format(subset=['Ley Real (%)', 'Peso (λ)', 'Aporte (%)'], formatter="{:.4f}").background_gradient(subset=['Peso (λ)'], cmap='Greens'))
+        #st.dataframe(df_w.style.format(subset=['Ley Real (%)', 'Peso (λ)', 'Aporte (%)'], formatter="{:.4f}").background_gradient(subset=['Peso (λ)'], cmap='Greens'))
+        st.dataframe(df_w)
         
         total_aporte = np.sum(aportes)
         st.markdown(f"### 👉 SUMA TOTAL (Z*) = **{total_aporte:.4f} %**")
@@ -752,3 +753,4 @@ with tabs[6]:
         href = f'<a href="data:text/html;base64,{b64}" download="Informe_Tecnico_Oficial.html"><button style="background:#d32f2f; color:white; padding:12px 25px; border:none; border-radius:5px; cursor:pointer; font-size:1.1em; margin-top:10px;">📥 DESCARGAR INFORME OFICIAL (PDF)</button></a>'
 
         st.markdown(href, unsafe_allow_html=True)
+
