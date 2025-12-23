@@ -5,46 +5,60 @@ import os
 import base64
 from datetime import datetime
 from scipy.spatial.distance import cdist
+from scipy.stats import norm, skew, kurtosis
 import plotly.graph_objects as go
 import plotly.express as px
-from scipy.stats import norm
 
 # ==============================================================================
-# 1. CONFIGURACIÓN DEL UNIVERSO (SETUP)
+# 0. CONFIGURACIÓN INICIAL DEL SISTEMA
 # ==============================================================================
+# Configuración de la página debe ser la primera instrucción de Streamlit
 st.set_page_config(
-    page_title="GEOESTADISTICA MINERA - KRIGING PRO", 
+    page_title="GEOESTADISTICA MINERA - KRIGING PRO v2.0 (EDUCATIVO)", 
     page_icon="⚒️", 
     layout="wide",
     initial_sidebar_state="expanded"
 )
 
 # ==============================================================================
-# 2. PROTOCOLO VISUAL (ESTILOS CSS AVANZADOS & DARK MODE)
+# 1. PROTOCOLO VISUAL (CSS AVANZADO & DARK MODE CORPORATIVO)
 # ==============================================================================
+# Se ha ampliado el CSS para incluir estilos específicos para la visualización
+# de matrices, cajas de teoría pedagógica y alertas JORC.
 st.markdown("""
     <style>
-    /* --- CONFIGURACIÓN GENERAL --- */
+    /* --- IMPORTACIÓN DE FUENTES --- */
+    @import url('https://fonts.googleapis.com/css2?family=Roboto+Mono:wght@400;700&family=Segoe+UI:wght@400;600;800&display=swap');
+
+    /* --- CONFIGURACIÓN GENERAL DEL BODY --- */
     .stApp {
         background-color: #0e1117; 
         color: #e0e0e0;
         font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
     }
     
-    /* --- TIPOGRAFÍA --- */
-    h1, h2, h3 {color: #ffffff; font-weight: 600;}
-    h4, h5, h6 {color: #b0bec5;}
-    p, li, label, span {font-size: 16px; line-height: 1.6;}
+    /* --- TIPOGRAFÍA Y ENCABEZADOS --- */
+    h1 { color: #ffffff; font-weight: 800; font-size: 2.5rem; letter-spacing: -1px; }
+    h2 { color: #90caf9; font-weight: 700; border-bottom: 2px solid #1e88e5; padding-bottom: 10px; }
+    h3 { color: #e3f2fd; font-weight: 600; margin-top: 20px; }
+    h4, h5, h6 { color: #b0bec5; font-family: 'Roboto Mono', monospace; }
+    p, li, label, span { font-size: 16px; line-height: 1.6; }
     
-    /* --- CAJAS EDUCATIVAS (TEORÍA) --- */
+    /* --- CAJAS EDUCATIVAS (TEORÍA - DOCENTE) --- */
+    /* Estas cajas guían al estudiante paso a paso */
     .theory-box {
-        background-color: #1a2332; 
+        background: linear-gradient(135deg, #1a2332 0%, #151922 100%); 
         border-left: 6px solid #00bcd4;
         padding: 25px; 
-        border-radius: 10px; 
+        border-radius: 12px; 
         margin-bottom: 25px;
-        box-shadow: 0 4px 15px rgba(0,0,0,0.3); 
+        box-shadow: 0 4px 20px rgba(0,0,0,0.4); 
         color: #e1f5fe;
+        transition: transform 0.2s;
+    }
+    .theory-box:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 8px 25px rgba(0, 188, 212, 0.2);
     }
     .theory-title {
         color: #4dd0e1; 
@@ -53,12 +67,12 @@ st.markdown("""
         display: block; 
         margin-bottom: 12px;
         text-transform: uppercase; 
-        letter-spacing: 1.2px;
-        border-bottom: 1px solid #4dd0e1;
-        padding-bottom: 5px;
+        letter-spacing: 1.5px;
+        border-bottom: 1px solid rgba(77, 208, 225, 0.3);
+        padding-bottom: 8px;
     }
     
-    /* --- CAJAS DE RESULTADOS (EXITO) --- */
+    /* --- ALERTAS Y RESULTADOS (EXITO) --- */
     .result-box {
         background-color: #1b3a25;
         border-left: 6px solid #00e676;
@@ -69,46 +83,61 @@ st.markdown("""
         box-shadow: 0 4px 10px rgba(0,230,118,0.1);
     }
 
-    /* --- CAJAS DE MATEMÁTICA (EXPLICACIÓN DE FÓRMULAS) --- */
+    /* --- CAJAS MATEMÁTICAS (EXPLICACIÓN DE FÓRMULAS - PASO A PASO) --- */
     .math-step {
         background-color: #263238;
         border: 1px solid #37474f;
-        border-left: 4px solid #ffca28;
-        padding: 15px; 
-        border-radius: 5px; 
+        border-left: 5px solid #ffca28;
+        padding: 20px; 
+        border-radius: 8px; 
         margin-top: 15px;
+        margin-bottom: 15px;
         color: #eceff1; 
-        font-family: 'Courier New', monospace;
+        font-family: 'Roboto Mono', monospace;
         font-size: 0.95em;
+    }
+    .matrix-container {
+        overflow-x: auto;
+        padding: 10px;
+        background-color: #121212;
+        border-radius: 5px;
+        margin-top: 10px;
     }
 
     /* --- SEMÁFORO JORC (CLASIFICACIÓN) --- */
     .jorc-card {
-        padding: 25px; 
+        padding: 30px; 
         border-radius: 15px; 
         text-align: center; 
         margin-bottom: 20px;
-        transition: transform 0.3s;
+        transition: all 0.3s ease;
+        position: relative;
+        overflow: hidden;
     }
-    .jorc-card:hover { transform: scale(1.02); }
+    .jorc-card::before {
+        content: '';
+        position: absolute;
+        top: 0; left: 0; width: 100%; height: 5px;
+        background: rgba(255,255,255,0.3);
+    }
     
     .jorc-medido {
         background: linear-gradient(145deg, #1b5e20, #2e7d32); 
         border: 2px solid #66bb6a; 
         color: #ffffff;
-        box-shadow: 0 0 20px rgba(102, 187, 106, 0.4);
+        box-shadow: 0 0 25px rgba(102, 187, 106, 0.5);
     }
     .jorc-indicado {
         background: linear-gradient(145deg, #e65100, #f57c00); 
         border: 2px solid #ffb74d; 
         color: #ffffff;
-        box-shadow: 0 0 20px rgba(255, 183, 77, 0.4);
+        box-shadow: 0 0 25px rgba(255, 183, 77, 0.5);
     }
     .jorc-inferido {
         background: linear-gradient(145deg, #b71c1c, #c62828); 
         border: 2px solid #ef5350; 
         color: #ffffff;
-        box-shadow: 0 0 20px rgba(239, 83, 80, 0.4);
+        box-shadow: 0 0 25px rgba(239, 83, 80, 0.5);
     }
 
     /* --- BOTONES PERSONALIZADOS --- */
@@ -117,38 +146,47 @@ st.markdown("""
         color: white; 
         border: none;
         border-radius: 8px; 
-        height: 55px; 
-        font-weight: bold; 
-        font-size: 1.2em;
+        height: 60px; 
+        font-weight: 800; 
+        font-size: 1.3em;
         text-transform: uppercase;
-        letter-spacing: 1px;
+        letter-spacing: 1.5px;
         width: 100%;
         box-shadow: 0 4px 6px rgba(0,0,0,0.3);
-        transition: all 0.3s ease;
+        transition: all 0.3s cubic-bezier(0.25, 0.8, 0.25, 1);
     }
     .stButton>button:hover {
         background: linear-gradient(90deg, #0288d1 0%, #0277bd 100%);
-        box-shadow: 0 8px 15px rgba(2, 119, 189, 0.6);
-        transform: translateY(-2px);
+        box-shadow: 0 10px 20px rgba(2, 119, 189, 0.6);
+        transform: translateY(-3px);
+    }
+    .stButton>button:active {
+        transform: translateY(1px);
     }
 
     /* --- PESTAÑAS (TABS) --- */
     .stTabs [data-baseweb="tab-list"] {
-        gap: 8px; 
+        gap: 10px; 
         background-color: #0e1117;
-        padding-bottom: 10px;
+        padding-bottom: 15px;
+        border-bottom: 2px solid #374151;
     }
     .stTabs [data-baseweb="tab"] {
         background-color: #1f2937; 
         color: #b0bec5; 
         border: 1px solid #374151; 
-        border-radius: 5px 5px 0 0;
-        padding: 12px 25px;
+        border-radius: 8px 8px 0 0;
+        padding: 15px 30px;
         font-size: 1.1em;
+        transition: all 0.2s;
+    }
+    .stTabs [data-baseweb="tab"]:hover {
+        background-color: #37474f;
+        color: #ffffff;
     }
     .stTabs [aria-selected="true"] {
         background-color: #263238; 
-        border-top: 4px solid #00bcd4; 
+        border-top: 5px solid #00bcd4; 
         color: #ffffff;
         font-weight: bold;
     }
@@ -156,59 +194,95 @@ st.markdown("""
     /* --- TABLAS DATAFRAME --- */
     [data-testid="stDataFrame"] {
         border: 1px solid #374151;
+        border-radius: 8px;
+        background-color: #1a2332;
+    }
+    
+    /* --- INPUTS --- */
+    .stTextInput>div>div>input {
+        background-color: #1f2937;
+        color: white;
         border-radius: 5px;
+    }
+    .stNumberInput>div>div>input {
+        background-color: #1f2937;
+        color: white;
     }
     </style>
     """, unsafe_allow_html=True)
 
 # ==============================================================================
-# 3. GESTIÓN DE ESTADO Y DATOS (BACKEND)
+# 2. GESTIÓN DE ESTADO, DATOS Y VARIABLES GLOBALES (BACKEND)
 # ==============================================================================
 
-# Inicialización de Datos (Ejemplo PDF "Proyecto Altiplano Sur")
+# Inicialización de Datos por Defecto (Fall-back data)
 if 'df_data' not in st.session_state:
     st.session_state['df_data'] = pd.DataFrame({
-        'ID': ['DDH-101', 'DDH-102', 'DDH-103', 'DDH-104'],
-        'X': [385250.0, 385275.0, 385300.0, 385320.0],
-        'Y': [8245100.0, 8245125.0, 8245080.0, 8245150.0],
-        'Ley': [0.85, 1.12, 0.72, 0.95]
+        'Id': ['DDH-101', 'DDH-102', 'DDH-103', 'DDH-104', 'DDH-105', 'DDH-106'], # <--- AQUÍ ESTABA EL ERROR (Decía 'ID')
+        'X': [385250.0, 385275.0, 385300.0, 385320.0, 385260.0, 385310.0],
+        'Y': [8245100.0, 8245125.0, 8245080.0, 8245150.0, 8245090.0, 8245140.0],
+        'Ley': [0.85, 1.12, 0.72, 0.95, 0.65, 1.05]
     })
 
 if 'resultado' not in st.session_state:
     st.session_state['resultado'] = None
 
-# Función: Cargar Archivo CSV (Blindada contra errores de tipo)
+# Variables de Sesión para Información del Proyecto y Estudiantes
+if 'project_name' not in st.session_state:
+    st.session_state['project_name'] = "PROYECTO ACADÉMICO MINA ESCUELA"
+if 'student_names' not in st.session_state:
+    st.session_state['student_names'] = ["Estudiante 1"]
+if 'docente_name' not in st.session_state:
+    st.session_state['docente_name'] = "Ing. Arturo R. Chayña Rodríguez" # DOCENTE FIJO OBLIGATORIO
+
+# --- FUNCIONES DE BACKEND ---
+
 def cargar_csv():
-    """Carga y valida el archivo CSV subido por el usuario."""
+    """
+    Carga, valida y normaliza el archivo CSV subido por el usuario.
+    Incluye manejo de errores robusto para evitar caídas del sistema.
+    """
     uploaded = st.session_state.uploader_key
     if uploaded is not None:
         try:
             df = pd.read_csv(uploaded)
-            # Normalizar nombres de columnas
+            # 1. Normalización: Eliminar espacios y capitalizar (ej: " ley " -> "Ley")
             cols = [c.strip().capitalize() for c in df.columns]
             df.columns = cols
             
-            # Validación de columnas críticas
+            # 2. Validación de columnas críticas (X, Y, Ley)
             required_cols = {'X', 'Y', 'Ley'}
             if required_cols.issubset(df.columns):
-                # Generar IDs si no existen
+                # Generar IDs si no existen para trazabilidad
                 if 'Id' not in df.columns: 
-                    df['Id'] = [f"M-{i+1}" for i in range(len(df))]
-                # Convertir a string para evitar errores de formato posteriores
+                    df['Id'] = [f"MUESTRA-{i+1}" for i in range(len(df))]
+                
+                # Conversión de tipos segura
                 df['Id'] = df['Id'].astype(str)
+                df['X'] = pd.to_numeric(df['X'], errors='coerce')
+                df['Y'] = pd.to_numeric(df['Y'], errors='coerce')
+                df['Ley'] = pd.to_numeric(df['Ley'], errors='coerce')
+                
+                # Eliminar filas con nulos generados por la conversión
+                df = df.dropna(subset=['X', 'Y', 'Ley'])
+                
                 st.session_state['df_data'] = df
-                st.toast("✅ Base de datos actualizada correctamente.")
+                st.toast("✅ Base de datos cargada y normalizada correctamente.", icon="💾")
             else:
-                st.error(f"❌ El archivo debe contener las columnas: {required_cols}")
+                st.error(f"❌ Error de Formato: El archivo CSV debe contener obligatoriamente las columnas: {required_cols}")
+                st.info("Por favor, revise que su CSV use punto (.) para decimales y coma (,) para separar columnas.")
         except Exception as e:
-            st.error(f"Error crítico al leer el archivo: {e}")
+            st.error(f"Error crítico al leer el archivo: {str(e)}")
 
-# Función: Guardar Historial (Persistencia)
 def guardar_historial(res):
-    """Guarda cada cálculo realizado en un archivo CSV local."""
+    """
+    Persistencia local de resultados para trazabilidad.
+    Guarda cada cálculo exitoso en 'historial_proyecto.csv'.
+    """
     archivo = 'historial_proyecto.csv'
     nuevo_registro = {
         'Fecha': datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+        'Proyecto': st.session_state['project_name'],
         'X_Bloque': res['tx'], 
         'Y_Bloque': res['ty'],
         'Ley_Estimada': round(res['ley'], 4),
@@ -218,67 +292,110 @@ def guardar_historial(res):
     }
     df_new = pd.DataFrame([nuevo_registro])
     
-    # Modo 'append' si existe, modo 'write' si no
-    if not os.path.exists(archivo):
-        df_new.to_csv(archivo, index=False)
-    else:
-        df_new.to_csv(archivo, mode='a', header=False, index=False)
+    # Lógica Append/Write
+    try:
+        if not os.path.exists(archivo):
+            df_new.to_csv(archivo, index=False)
+        else:
+            df_new.to_csv(archivo, mode='a', header=False, index=False)
+    except PermissionError:
+        st.warning("⚠️ No se pudo guardar el historial. Cierre el archivo CSV si lo tiene abierto.")
 
 # ==============================================================================
-# 4. MOTOR MATEMÁTICO (CORE DE CÁLCULO)
+# 3. MOTOR MATEMÁTICO (GEOESTADÍSTICA PURA)
 # ==============================================================================
 
 def variograma_esferico(h, c0, c1, a):
-    """Calcula el valor del variograma teórico usando el modelo Esférico."""
+    """
+    Calcula el valor del variograma teórico usando el modelo Esférico.
+    
+    Args:
+        h (array): Distancias.
+        c0 (float): Efecto Pepita (Nugget).
+        c1 (float): Meseta Parcial (Sill - Nugget).
+        a (float): Rango (Alcance).
+    
+    Returns:
+        array: Valores de gamma correspondientes.
+    """
     h = np.atleast_1d(h)
     val = np.zeros_like(h)
     c_total = c0 + c1 
     
+    # Caso 1: h > Rango (Meseta)
     mask_r = h > a
     val[mask_r] = c_total
     
+    # Caso 2: h <= Rango (Curva esférica)
     mask_i = ~mask_r
+    # Fórmula Esférica Clásica: C0 + C1 * [1.5(h/a) - 0.5(h/a)^3]
     val[mask_i] = c0 + c1 * (1.5 * (h[mask_i] / a) - 0.5 * (h[mask_i] / a)**3)
+    
+    # Caso 3: h = 0 (Por definición gamma(0)=0, aunque nugget sea > 0)
     val[h == 0] = 0
     return val
 
 def resolver_kriging(df, target, c0, c1, a):
-    """Resuelve el sistema de ecuaciones de Kriging Ordinario (OK)."""
+    """
+    Resuelve el sistema de ecuaciones de Kriging Ordinario (OK).
+    
+    El sistema matricial es: [K] * [W] = [M]
+    Donde:
+        K: Matriz de varianzas entre muestras (más fila/columna Lagrange).
+        W: Vector de pesos incógnita.
+        M: Vector de varianzas muestra-bloque.
+    """
     try:
         coords = df[['X', 'Y']].values
         leyes = df['Ley'].values
         n = len(coords)
         
-        # 1. Distancias
+        # 1. Matriz de Distancias (Euclidiana)
+        # cdist calcula la distancia entre todos los pares de puntos
         dist_mat = cdist(coords, coords)
         dist_target = cdist(coords, [target]).flatten()
         
-        # 2. Matrices Kriging
+        # 2. Construcción de Matrices Kriging
+        # Matriz K (n+1 x n+1) por el multiplicador de Lagrange
         K = np.zeros((n+1, n+1))
         M = np.zeros(n+1)
         
+        # Llenado usando el modelo variográfico elegido
         K_vals = variograma_esferico(dist_mat, c0, c1, a)
         K[:n, :n] = K_vals
+        # Condiciones de insesgo (suma de pesos = 1)
         K[n, :] = 1.0; K[:, n] = 1.0; K[n, n] = 0.0
         
+        # Vector M (n+1)
         M_vals = variograma_esferico(dist_target, c0, c1, a)
         M[:n] = M_vals; M[n] = 1.0 
         
-        # 3. Resolución
+        # 3. Resolución del Sistema Lineal (Inversión Matricial)
+        # Usamos solve que es numéricamente más estable que inv(K)
         W = np.linalg.solve(K, M)
         pesos = W[:n]
-        mu = W[n]
+        mu = W[n] # Multiplicador de Lagrange
         
-        # 4. Resultados
+        # 4. Cálculo de Resultados Finales
         ley_est = np.sum(pesos * leyes)
-        var_krig = np.sum(pesos * M_vals) + mu
-        sigma_k = np.sqrt(var_krig) if var_krig > 0 else 0
         
-        # 5. JORC
+        # Varianza de Kriging Ordinario: Sum(Wi * Gamma_i_Bloque) + mu
+        var_krig = np.sum(pesos * M_vals) + mu
+        
+        # Control de errores numéricos (varianza negativa por precisión de float)
+        if var_krig < 0: var_krig = 0
+        
+        sigma_k = np.sqrt(var_krig)
+        
+        # 5. Clasificación JORC / NI 43-101 (Criterio Simplificado por CV)
+        # CV = (Desviación / Media) * 100
         cv_kriging = (sigma_k / ley_est * 100) if ley_est > 0 else 100
+        
+        # Slope of Regression (Calidad de estimación condicional)
         var_global = np.var(leyes, ddof=1) if len(leyes) > 1 else 1.0
         slope = 1.0 - (var_krig / var_global) if var_global > 0 else 0
         
+        # Umbrales didácticos estándar
         if cv_kriging < 15: cat = "MEDIDO"
         elif 15 <= cv_kriging <= 30: cat = "INDICADO"
         else: cat = "INFERIDO"
@@ -287,71 +404,116 @@ def resolver_kriging(df, target, c0, c1, a):
             'status': 'OK', 
             'ley': ley_est, 'var': var_krig, 'sigma': sigma_k,
             'cv_k': cv_kriging, 'slope': slope, 'cat': cat,
-            'pesos': pesos, 'mu': mu, 'K': K, 'M': M, 
+            'pesos': pesos, 'mu': mu, 'K': K, 'M': M, 'W_raw': W,
             'd_mat': dist_mat, 'd_vec': dist_target
         }
+    except np.linalg.LinAlgError:
+        return {'status': 'ERROR', 'msg': "Error Matemático: Matriz Singular. Posiblemente hay muestras duplicadas en la misma ubicación (X, Y)."}
     except Exception as e:
         return {'status': 'ERROR', 'msg': str(e)}
 
 # ==============================================================================
-# 5. INTERFAZ GRÁFICA (FRONTEND)
+# 4. INTERFAZ GRÁFICA (FRONTEND)
 # ==============================================================================
 
-# --- BARRA LATERAL ---
+# --- BARRA LATERAL (SIDEBAR) MEJORADA ---
 with st.sidebar:
-    st.image("https://cdn-icons-png.flaticon.com/512/3135/3135715.png", width=120)
+    st.image("https://cdn-icons-png.flaticon.com/512/3135/3135715.png", width=100)
     st.markdown("## 🏗️ PANEL DE CONTROL")
     st.markdown("---")
-    st.markdown("**📁 Proyecto:** POMPERIA S.A.C.")
-    st.markdown("**👷 Estudiante:** Felix Bautista Layme")
+    
+    # 1. Configuración del Proyecto (Editable)
+    st.markdown("### 📝 Datos del Proyecto")
+    st.session_state['project_name'] = st.text_input("Nombre del Proyecto:", value=st.session_state['project_name'])
+    
+    st.markdown("### 👨‍🎓 Equipo de Estudiantes")
+    num_students = st.number_input("Número de integrantes", 1, 4, 1)
+    
+    student_list = []
+    for i in range(num_students):
+        student_list.append(st.text_input(f"Estudiante {i+1}:", value=st.session_state['student_names'][0] if i==0 else f"Estudiante {i+1}"))
+    st.session_state['student_names'] = student_list
+    
+    st.markdown("---")
+    st.markdown(f"**🎓 Docente:**\n{st.session_state['docente_name']}")
     st.markdown("**📅 Fecha:** " + datetime.now().strftime("%d/%m/%Y"))
     
     st.markdown("---")
-    st.markdown("### 📚 GLOSARIO MINERO")
-    with st.expander("Ver Definiciones"):
+    st.markdown("### 📚 GLOSARIO TÉCNICO")
+    with st.expander("📖 Ver Definiciones (A-Z)"):
         st.markdown("""
-        **1. Kriging Ordinario:** Método geoestadístico de estimación que minimiza la varianza del error y es insesgado.
-        **2. Nugget (C0):** Variabilidad a muy corta distancia.
-        **3. Sill (C):** Varianza total de los datos.
-        **4. Rango (a):** Distancia hasta donde las muestras tienen correlación espacial.
-        """)
+        **A - Anisotropía:** Variabilidad distinta según la dirección.
+        <hr style="margin:5px 0">
+        **C - Covarianza:** Medida de correlación espacial.
+        <hr style="margin:5px 0">
+        **K - Kriging:** Estimador lineal insesgado óptimo (BLUE).
+        <hr style="margin:5px 0">
+        **N - Nugget (C0):** Variabilidad a muy corta distancia o error de muestreo.
+        <hr style="margin:5px 0">
+        **R - Rango (a):** Distancia donde las muestras dejan de tener correlación.
+        <hr style="margin:5px 0">
+        **S - Sill (Meseta):** Varianza total de la población.
+        <hr style="margin:5px 0">
+        **V - Varianza de Kriging:** Error de estimación asociado al bloque.
+        """, unsafe_allow_html=True)
     
-    st.success("💾 **Sistema Guardando Automáticamente**")
+    st.success("✅ **Sistema en Línea**")
+    st.markdown("<div style='text-align:center; color:#555; font-size:0.8em;'>v2.0 Build 2025</div>", unsafe_allow_html=True)
 
-st.title("GEOESTADÍSTICA MINERA - KRIGING")
-st.markdown("#### Simulador Profesional de Estimación de Recursos Minerales (v28.0)")
+# --- CABECERA PRINCIPAL ---
+st.title(f"{st.session_state['project_name']}")
+st.markdown(f"#### Simulador Profesional de Estimación de Recursos Minerales | Curso de Geoestadística")
 
+# Definición de Pestañas
 tabs = st.tabs([
-    "📊 1. Análisis de Datos", 
-    "📈 2. Variografía", 
-    "⚙️ 3. Estimación", 
-    "🧮 4. Ingeniería Inversa (Detallada)",
-    "💰 5. Economía",
-    "⚖️ 6. JORC (Avanzado)", 
-    "📜 7. Informe Final"
+    "📊 1. ANÁLISIS DE DATOS (QA/QC)", 
+    "📈 2. VARIOGRAFÍA ESTRUCTURAL", 
+    "⚙️ 3. ESTIMACIÓN (KRIGING)", 
+    "🧮 4. INGENIERÍA INVERSA (WHITE BOX)",
+    "💰 5. ECONOMÍA MINERA",
+    "⚖️ 6. CLASIFICACIÓN JORC", 
+    "📜 7. INFORME OFICIAL"
 ])
 
-# --- TAB 1: ANÁLISIS DE DATOS ---
+# ==============================================================================
+# TAB 1: ANÁLISIS DE DATOS (QA/QC)
+# ==============================================================================
 with tabs[0]:
     st.markdown("""
     <div class='theory-box'>
-        <span class='theory-title'>🔍 Módulo 1: Validación de Datos (QA/QC)</span>
-        El primer paso de cualquier estimación es conocer la muestra. Aquí buscamos <b>comportamientos anómalos</b> que puedan invalidar el Kriging.
+        <span class='theory-title'>🔍 Módulo 1: Validación y Análisis Exploratorio de Datos (EDA)</span>
+        <p>Antes de realizar cualquier estimación, el <b>Ingeniero Geoestadístico</b> debe auditar sus datos ("Conoce tus datos"). 
+        Buscamos valores atípicos (outliers), errores de coordenadas y entendemos la distribución estadística.</p>
     </div>
     """, unsafe_allow_html=True)
 
     c1, c2 = st.columns([1, 1.5])
+    
     with c1:
-        st.subheader("Base de Datos")
-        st.file_uploader("Cargar Archivo CSV", type=['csv'], key="uploader_key", on_change=cargar_csv)
-        st.data_editor(st.session_state['df_data'], num_rows="dynamic", height=250)
-        st.info("💡 Tip: Verifica que no haya leyes negativas o coordenadas cero.")
+        st.subheader("📥 Carga de Base de Datos")
+        
+        with st.expander("ℹ️ Instrucciones y Formato CSV"):
+            st.markdown("""
+            Para usar tus propios datos, sube un archivo **.csv** con las siguientes columnas (el orden no importa, pero los nombres sí):
+            | X | Y | Ley | ID (Opcional) |
+            |---|---|---|---|
+            | 100 | 200 | 1.5 | M-1 |
+            | 110 | 210 | 2.1 | M-2 |
+            
+            *Nota: Usa punto (.) para decimales.*
+            """)
+        
+        st.file_uploader("Arrastra tu archivo aquí:", type=['csv'], key="uploader_key", on_change=cargar_csv)
+        
+        st.markdown("### 📋 Vista Previa de Datos")
+        st.dataframe(st.session_state['df_data'], height=300, use_container_width=True)
+        st.info(f"Total de Muestras: **{len(st.session_state['df_data'])}**")
 
     with c2:
-        st.subheader("Estadística Descriptiva")
+        st.subheader("📊 Estadística Descriptiva y Gráficos")
         df = st.session_state['df_data']
         
-        # --- LIMPIEZA DE DATOS SEGURA ---
+        # Limpieza interna para cálculos
         df_calc = df.copy()
         cols_numericas = ['X', 'Y', 'Ley']
         for col in cols_numericas:
@@ -359,398 +521,662 @@ with tabs[0]:
         df_calc = df_calc.dropna(subset=cols_numericas)
         
         if not df_calc.empty:
+            # Cálculos Estadísticos Avanzados
             media = df_calc['Ley'].mean()
+            mediana = df_calc['Ley'].median()
             std = df_calc['Ley'].std()
+            min_val = df_calc['Ley'].min()
+            max_val = df_calc['Ley'].max()
+            var = df_calc['Ley'].var()
+            kurt = kurtosis(df_calc['Ley'])
+            skewness = skew(df_calc['Ley'])
             cv = (std/media*100) if media>0 else 0
             
-            k1, k2, k3 = st.columns(3)
-            k1.metric("Ley Media", f"{media:.2f} %")
-            k2.metric("Desviación Std.", f"{std:.2f}")
-            k3.metric("Coef. Variación (CV)", f"{cv:.1f} %", delta="¡Atención!" if cv>100 else "Ok", delta_color="inverse")
+            # --- TARJETAS MÉTRICAS ---
+            col_m1, col_m2, col_m3, col_m4 = st.columns(4)
+            col_m1.metric("Media (Ley)", f"{media:.2f} %", help="Promedio aritmético de las leyes")
+            col_m2.metric("Desviación Std.", f"{std:.2f}", help="Dispersión de los datos respecto a la media")
+            col_m3.metric("Coef. Variación", f"{cv:.1f} %", delta="Alto Riesgo" if cv>100 else "Estable", delta_color="inverse")
+            col_m4.metric("Máximo", f"{max_val:.2f} %")
             
+            st.markdown("---")
+            
+            # --- INTERPRETACIÓN DOCENTE ---
             st.markdown(f"""
-            <div class='explain-box'>
-                <b>📊 Interpretación del C.V. ({cv:.1f}%):</b><br>
+            <div class='math-step'>
+                <b>🧠 Interpretación Docente:</b><br>
                 <ul>
-                    <li><b>CV < 50%:</b> Datos muy homogéneos. Ideal para Kriging Lineal.</li>
-                    <li><b>50% < CV < 100%:</b> Variabilidad moderada.</li>
-                    <li><b>CV > 100%:</b> Datos erráticos. Significa que tienes "pepitas" de alta ley.</li>
+                    <li>El <b>Coeficiente de Variación (CV)</b> es {cv:.2f}%. 
+                        {"Si es < 50%, la distribución es regular y fácil de estimar." if cv < 50 else 
+                         "Si está entre 50-100%, requiere cuidado. Si es > 100%, indica presencia de 'Pepitas' (valores extremos) que pueden sesgar el Kriging."}
+                    </li>
+                    <li><b>Sesgo (Skewness):</b> {skewness:.2f}. {"Valor positivo indica cola a la derecha (muchas leyes bajas, pocas altas)." if skewness > 0 else "Valor negativo indica cola a la izquierda."}</li>
+                    <li><b>Curtosis:</b> {kurt:.2f}. Indica qué tan 'puntiaguda' es la distribución.</li>
                 </ul>
             </div>
             """, unsafe_allow_html=True)
             
-            t1, t2 = st.tabs(["Distribución", "Análisis de Deriva"])
+            # --- PESTAÑAS GRÁFICAS ---
+            t1, t2, t3 = st.tabs(["📊 Histograma & Boxplot", "🗺️ Mapa de Ubicación", "📈 Derivas (Tendencias)"])
+            
             with t1:
-                fig_h = px.histogram(df_calc, x="Ley", nbins=10, title="Histograma de Frecuencias", color_discrete_sequence=['#00e676'])
-                fig_h.update_layout(template="plotly_dark", height=300)
-                st.plotly_chart(fig_h, use_container_width=True)
+                # Histograma y Boxplot combinados
+                fig_dist = px.histogram(
+                    df_calc, x="Ley", nbins=15, marginal="box", 
+                    title="Distribución de Frecuencias de Ley",
+                    color_discrete_sequence=['#00bcd4'],
+                    hover_data=df_calc.columns
+                )
+                fig_dist.add_vline(x=media, line_dash="dash", line_color="red", annotation_text="Media")
+                fig_dist.update_layout(template="plotly_dark", height=350, bargap=0.1)
+                st.plotly_chart(fig_dist, use_container_width=True)
             
             with t2:
-                col_d1, col_d2 = st.columns(2)
-                with col_d1:
-                    if len(df_calc) > 1:
-                        slope, intercept = np.polyfit(df_calc['X'], df_calc['Ley'], 1)
-                        fig_x = px.scatter(df_calc, x='X', y='Ley', title="Tendencia Este-Oeste")
-                        fig_x.add_trace(go.Scatter(x=df_calc['X'], y=slope*df_calc['X']+intercept, mode='lines', line=dict(color='red'), name='Tendencia'))
-                        fig_x.update_layout(template="plotly_dark", height=300)
-                        st.plotly_chart(fig_x, use_container_width=True)
-                    else:
-                        st.warning("Se necesitan al menos 2 datos.")
-                        
-                with col_d2:
-                    if len(df_calc) > 1:
-                        slope_y, intercept_y = np.polyfit(df_calc['Y'], df_calc['Ley'], 1)
-                        fig_y = px.scatter(df_calc, x='Y', y='Ley', title="Tendencia Norte-Sur")
-                        fig_y.add_trace(go.Scatter(x=df_calc['Y'], y=slope_y*df_calc['Y']+intercept_y, mode='lines', line=dict(color='red'), name='Tendencia'))
-                        fig_y.update_layout(template="plotly_dark", height=300)
-                        st.plotly_chart(fig_y, use_container_width=True)
-                    else:
-                        st.warning("Se necesitan al menos 2 datos.")
+                # Mapa de Ubicación (Scatter Plot)
+                fig_map = px.scatter(
+                    df_calc, x='X', y='Y', size='Ley', color='Ley',
+                    hover_name='Id', title="Mapa de Ubicación de Sondajes (Planta)",
+                    color_continuous_scale='Viridis', size_max=40
+                )
+                fig_map.update_layout(template="plotly_dark", height=350)
+                st.plotly_chart(fig_map, use_container_width=True)
 
-# --- TAB 2: VARIOGRAFÍA ---
+            with t3:
+                # Análisis de Deriva (Drift Analysis)
+                c_d1, c_d2 = st.columns(2)
+                with c_d1:
+                    fig_dx = px.scatter(df_calc, x='X', y='Ley', trendline="ols", title="Deriva Este-Oeste", trendline_color_override="red")
+                    fig_dx.update_layout(template="plotly_dark", height=300)
+                    st.plotly_chart(fig_dx, use_container_width=True)
+                with c_d2:
+                    fig_dy = px.scatter(df_calc, x='Y', y='Ley', trendline="ols", title="Deriva Norte-Sur", trendline_color_override="red")
+                    fig_dy.update_layout(template="plotly_dark", height=300)
+                    st.plotly_chart(fig_dy, use_container_width=True)
+        else:
+            st.warning("⚠️ No hay datos válidos para procesar.")
+
+# ==============================================================================
+# TAB 2: VARIOGRAFÍA ESTRUCTURAL
+# ==============================================================================
 with tabs[1]:
     st.markdown("""
     <div class='theory-box'>
-        <span class='theory-title'>🔍 Módulo 2: Modelamiento Estructural</span>
-        El variograma define la continuidad espacial. Ajusta la curva azul (teórica) para que represente la geología del yacimiento.
+        <span class='theory-title'>📈 Módulo 2: Modelamiento del Variograma</span>
+        <p>El variograma es la herramienta fundamental de la Geoestadística. Nos dice <b>qué tan parecidas son dos muestras</b> en función de la distancia que las separa.
+        Debemos ajustar la curva teórica (Azul) a la realidad geológica del yacimiento.</p>
     </div>
     """, unsafe_allow_html=True)
     
-    cv1, cv2 = st.columns([1, 2])
+    cv1, cv2 = st.columns([1, 2.5])
+    
     with cv1:
-        st.subheader("Parámetros del Modelo")
-        v_c0 = st.number_input("C0 (Nugget - Efecto Pepita)", 0.0, 10.0, 0.015, format="%.3f")
-        v_c1 = st.number_input("C1 (Meseta Parcial)", 0.0, 50.0, 0.085, format="%.3f")
-        st.info(f"**Meseta Total (Sill):** {v_c0+v_c1:.3f}")
-        v_a  = st.number_input("Rango (Alcance)", 1.0, 500.0, 120.0, format="%.1f")
+        st.subheader("🛠️ Ajuste de Parámetros")
+        st.markdown("Modifique estos valores para ajustar el modelo:")
         
+        v_c0 = st.number_input("1️⃣ Efecto Pepita (C0 - Nugget)", 0.0, 50.0, 0.015, step=0.001, format="%.3f", help="Error aleatorio a distancia cero.")
+        v_c1 = st.number_input("2️⃣ Meseta Parcial (C1)", 0.0, 100.0, 0.085, step=0.001, format="%.3f", help="Varianza estructurada.")
+        v_a  = st.number_input("3️⃣ Rango / Alcance (a)", 1.0, 2000.0, 120.0, step=10.0, format="%.1f", help="Distancia máxima de correlación.")
+        
+        meseta_total = v_c0 + v_c1
+        st.info(f"🔢 **Meseta Total (Sill):** {meseta_total:.3f}")
+        
+        st.markdown("---")
         st.markdown("""
-        <div class='result-box'>
-            <b>Definiciones:</b>
-            <ul>
-                <li><b>Nugget:</b> Error a distancia cero.</li>
-                <li><b>Sill:</b> Varianza total.</li>
-                <li><b>Rango:</b> Distancia de influencia máxima.</li>
-            </ul>
-        </div>
-        """, unsafe_allow_html=True)
+        **Guía Rápida:**
+        * **Alto C0:** Muestreo errático.
+        * **Rango Corto:** Mineralización discontinua.
+        * **Rango Largo:** Mineralización continua y homogénea.
+        """)
     
     with cv2:
+        # Generación de datos para el gráfico
         h = np.linspace(0, v_a * 1.5, 100)
         gamma = variograma_esferico(h, v_c0, v_c1, v_a)
-        fig = go.Figure()
-        fig.add_trace(go.Scatter(x=h, y=gamma, mode='lines', name='Modelo Esférico', line=dict(color='#00bcd4', width=4)))
-        fig.add_hline(y=v_c0+v_c1, line_dash="dash", annotation_text="Meseta Total")
-        fig.add_vline(x=v_a, line_dash="dash", annotation_text="Rango")
-        fig.update_layout(title="Curva del Variograma Teórico", xaxis_title="Distancia (h)", yaxis_title="Gamma (γ)", template="plotly_dark", height=450)
-        st.plotly_chart(fig, use_container_width=True)
+        
+        fig_var = go.Figure()
+        
+        # Curva del Modelo
+        fig_var.add_trace(go.Scatter(x=h, y=gamma, mode='lines', name='Modelo Esférico', line=dict(color='#00bcd4', width=5)))
+        
+        # Líneas de Referencia (Anotaciones Didácticas)
+        fig_var.add_hline(y=meseta_total, line_dash="dash", line_color="green", annotation_text="Meseta (Sill)", annotation_position="top right")
+        fig_var.add_vline(x=v_a, line_dash="dash", line_color="orange", annotation_text="Rango (a)", annotation_position="bottom right")
+        
+        # Anotación Nugget
+        fig_var.add_annotation(x=0, y=v_c0, text="Nugget (C0)", showarrow=True, arrowhead=2, ax=40, ay=-40, font=dict(color="yellow"))
+        
+        fig_var.update_layout(
+            title="Variograma Teórico Ajustado",
+            xaxis_title="Distancia de Separación (h) [metros]",
+            yaxis_title="Variabilidad - Gamma (γ)",
+            template="plotly_dark",
+            height=500,
+            legend=dict(yanchor="top", y=0.99, xanchor="left", x=0.01)
+        )
+        st.plotly_chart(fig_var, use_container_width=True)
 
-# --- TAB 3: ESTIMACIÓN ---
+# ==============================================================================
+# TAB 3: ESTIMACIÓN (KRIGING)
+# ==============================================================================
 with tabs[2]:
     st.markdown("""
     <div class='theory-box'>
-        <span class='theory-title'>⚙️ Módulo 3: Estimación de Bloque</span>
-        El sistema resolverá las ecuaciones matriciales para encontrar los pesos óptimos y estimar la ley del bloque.
+        <span class='theory-title'>⚙️ Módulo 3: Estimación de Bloque (Interpolación)</span>
+        <p>Defina las coordenadas del centro del bloque a estimar. El algoritmo buscará las muestras cercanas, 
+        asignará pesos óptimos basados en el variograma (Tab 2) y calculará la ley más probable.</p>
     </div>
     """, unsafe_allow_html=True)
 
     c_izq, c_der = st.columns([1, 2])
+    
     with c_izq:
-        st.subheader("Configuración")
-        tx = st.number_input("Este (X) Bloque", value=385280.0)
-        ty = st.number_input("Norte (Y) Bloque", value=8245105.0)
+        st.subheader("📍 Coordenadas del Bloque")
+        # Pre-cargar valores centrales de los datos
+        default_x = df_calc['X'].mean()
+        default_y = df_calc['Y'].mean()
+        
+        tx = st.number_input("Coordenada Este (X)", value=float(round(default_x, 0)))
+        ty = st.number_input("Coordenada Norte (Y)", value=float(round(default_y, 0)))
+        
         st.divider()
+        
+        col_btn, col_info = st.columns([2, 1])
         if st.button("🚀 EJECUTAR KRIGING"):
-            res = resolver_kriging(df_calc, [tx, ty], v_c0, v_c1, v_a)
-            if res['status'] == 'OK':
-                res.update({'tx': tx, 'ty': ty, 'c0': v_c0, 'c1': v_c1, 'a': v_a, 'fecha': datetime.now()})
-                st.session_state['resultado'] = res
-                guardar_historial(res)
-                st.success("¡Cálculo Exitoso!")
-            else:
-                st.error(res['msg'])
+            with st.spinner('Resolviendo sistema matricial...'):
+                res = resolver_kriging(df_calc, [tx, ty], v_c0, v_c1, v_a)
+                if res['status'] == 'OK':
+                    # Añadimos metadatos al resultado
+                    res.update({'tx': tx, 'ty': ty, 'c0': v_c0, 'c1': v_c1, 'a': v_a, 'fecha': datetime.now()})
+                    st.session_state['resultado'] = res
+                    guardar_historial(res)
+                    st.success("¡Cálculo Exitoso!")
+                else:
+                    st.error(res['msg'])
+                    st.session_state['resultado'] = None
 
     with c_der:
         if st.session_state['resultado'] and st.session_state['resultado']['status']=='OK':
             res = st.session_state['resultado']
+            
+            # --- PANEL DE RESULTADOS DESTACADO ---
             st.markdown(f"""
-            <div style="background:#1f2937; border:2px solid #00e676; border-radius:10px; padding:20px; text-align:center;">
-                <h3 style="color:#00e676; margin:0;">LEY ESTIMADA (Z*)</h3>
-                <h1 style="color:white; font-size:4em; margin:10px 0;">{res['ley']:.4f} %</h1>
-                <div style="display:flex; justify-content:space-around; margin-top:15px;">
-                    <div>Varianza ($\sigma_k^2$)<br><b style="color:#b3e5fc; font-size:1.2em;">{res['var']:.4f}</b></div>
-                    <div>Desv. Std ($\sigma_k$)<br><b style="color:#b3e5fc; font-size:1.2em;">{res['sigma']:.4f}</b></div>
+            <div style="background: linear-gradient(135deg, #1f2937 0%, #111827 100%); border:2px solid #00e676; border-radius:15px; padding:25px; text-align:center; box-shadow: 0 0 20px rgba(0, 230, 118, 0.2);">
+                <h4 style="color:#00e676; margin:0; letter-spacing: 2px;">LEY ESTIMADA (Z*)</h4>
+                <h1 style="color:white; font-size:4.5em; margin:10px 0; text-shadow: 0 0 10px rgba(255,255,255,0.3);">{res['ley']:.4f} %</h1>
+                <div style="display:flex; justify-content:space-around; margin-top:20px; border-top: 1px solid #374151; padding-top: 15px;">
+                    <div>
+                        <span style="color:#b0bec5; font-size:0.9em;">Varianza de Estimación ($\sigma_k^2$)</span><br>
+                        <b style="color:#b3e5fc; font-size:1.4em;">{res['var']:.4f}</b>
+                    </div>
+                    <div>
+                        <span style="color:#b0bec5; font-size:0.9em;">Desviación Estándar ($\sigma_k$)</span><br>
+                        <b style="color:#b3e5fc; font-size:1.4em;">{res['sigma']:.4f}</b>
+                    </div>
+                    <div>
+                        <span style="color:#b0bec5; font-size:0.9em;">Pendiente (Slope)</span><br>
+                        <b style="color:#ffcc80; font-size:1.4em;">{res['slope']:.4f}</b>
+                    </div>
                 </div>
             </div>
             """, unsafe_allow_html=True)
             
-            fig = px.scatter(df_calc, x='X', y='Y', size='Ley', color='Ley', title="Plano de Estimación 2D", color_continuous_scale='Viridis')
-            fig.add_trace(go.Scatter(x=[tx], y=[ty], mode='markers+text', marker=dict(color='red', size=25, symbol='x'), text=["BLOQUE"], textposition="top center"))
-            t = np.linspace(0, 2*np.pi, 100)
-            fig.add_trace(go.Scatter(x=tx+v_a*np.cos(t), y=ty+v_a*np.sin(t), mode='lines', line=dict(dash='dash', color='white'), name='Radio Influencia'))
-            fig.update_layout(template="plotly_dark", height=400)
-            st.plotly_chart(fig, use_container_width=True)
+            # --- VISUALIZACIÓN 2D DEL BLOQUE Y MUESTRAS ---
+            # Detectamos si la columna se llama 'Id' o 'ID' automáticamente
+            col_id = 'Id' if 'Id' in df_calc.columns else 'ID'
 
-# --- TAB 4: INGENIERÍA INVERSA ---
+            fig_plan = px.scatter(df_calc, x='X', y='Y', size='Ley', color='Ley', 
+                                title=f"Plano de Estimación (Bloque en X:{tx:.1f}, Y:{ty:.1f})", 
+                                color_continuous_scale='Viridis',
+                                hover_data=[col_id]) # <--- Aquí usamos la columna detectada
+            
+            # Añadir el bloque como un marcador distinto
+            fig_plan.add_trace(go.Scatter(
+                x=[tx], y=[ty], mode='markers+text', 
+                marker=dict(color='#ff1744', size=30, symbol='square', line=dict(color='white', width=2)), 
+                name='BLOQUE A ESTIMAR', text=["BLOQUE"], textposition="top center",
+                textfont=dict(size=14, color="white", family="Arial Black")
+            ))
+            
+            # Añadir Radio de Influencia
+            t = np.linspace(0, 2*np.pi, 100)
+            fig_plan.add_trace(go.Scatter(
+                x=tx+v_a*np.cos(t), y=ty+v_a*np.sin(t), 
+                mode='lines', line=dict(dash='dash', color='white', width=1), 
+                name='Radio de Influencia (Rango)'
+            ))
+            
+            fig_plan.update_layout(template="plotly_dark", height=450, legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1))
+            st.plotly_chart(fig_plan, use_container_width=True)
+
+# ==============================================================================
+# TAB 4: INGENIERÍA INVERSA (BLACK BOX REVEALED) - SECCIÓN CLAVE
+# ==============================================================================
 with tabs[3]:
     if st.session_state['resultado']:
         res = st.session_state['resultado']
         st.markdown("""
         <div class='theory-box'>
-            <span class='theory-title'>🧮 Módulo 4: Desglose Matemático (Paso a Paso)</span>
-            Aquí abrimos la "caja negra" para que veas la matemática exacta detrás del resultado.
+            <span class='theory-title'>🧮 Módulo 4: "Caja Blanca" - Desglose Matemático</span>
+            <p>Aquí abrimos el algoritmo para fines docentes. Observará cómo se calculan las distancias, 
+            se construye el sistema matricial <b>[K] * [W] = [M]</b> y se obtiene el peso de cada muestra.</p>
         </div>
         """, unsafe_allow_html=True)
         
-        # --- PASO 1 ---
-        st.markdown("### Paso 1: Cálculo de Distancias Geométricas")
-        ids = [str(x) for x in df_calc.get('Id', [f'M-{i+1}' for i in range(len(df_calc))])]
-        data_dist = []
+        # --- PASO 1: GEOMETRÍA ---
+        st.markdown("### 🔹 Paso 1: Cálculo de Distancias Geométricas")
+        st.write("Calculamos la distancia euclidiana ($d$) desde cada sondaje hasta el centro del bloque.")
+        
+        ids = df_calc['Id'].tolist() if 'Id' in df_calc.columns else [str(i) for i in range(len(df_calc))]
+        
+        # Tabla detallada Paso 1
+        data_step1 = []
         for i in range(len(df_calc)):
             dist = res['d_vec'][i]
             dx = df_calc['X'].iloc[i] - res['tx']
             dy = df_calc['Y'].iloc[i] - res['ty']
-            formula_visible = f"√(({dx:.1f})² + ({dy:.1f})²)"
-            data_dist.append([ids[i], df_calc['X'].iloc[i], df_calc['Y'].iloc[i], formula_visible, dist])
+            data_step1.append({
+                "ID": ids[i],
+                "Este (X)": df_calc['X'].iloc[i],
+                "Norte (Y)": df_calc['Y'].iloc[i],
+                "ΔX": dx, "ΔY": dy,
+                "Distancia (m)": dist
+            })
+        st.dataframe(pd.DataFrame(data_step1).style.format({"Este (X)": "{:.2f}", "Norte (Y)": "{:.2f}", "ΔX": "{:.1f}", "ΔY": "{:.1f}", "Distancia (m)": "{:.3f}"}))
+
+        # --- PASO 2: VARIOGRAFÍA APLICADA ---
+        st.markdown("### 🔹 Paso 2: Conversión a Varianzas (Gamma)")
+        st.write(f"Usando el modelo ajustado (C0={res['c0']}, C1={res['c1']}, a={res['a']}), transformamos las distancias en valores de Gamma $\gamma(h)$.")
         
-        df_dist_show = pd.DataFrame(data_dist, columns=["Sondaje", "Este (X)", "Norte (Y)", "Fórmula Aplicada", "Distancia (m)"])
-        st.dataframe(df_dist_show.style.format(subset=["Este (X)", "Norte (Y)", "Distancia (m)"], formatter="{:.2f}"))
-
-        # --- PASO 2 ---
-        st.markdown("### Paso 2: Cálculo de Valores Gamma")
-        data_var = []
+        data_step2 = []
         for i in range(len(df_calc)):
-            h = res['d_vec'][i]
-            gam = res['M'][i]
-            data_var.append([ids[i], h, gam])
-        st.dataframe(pd.DataFrame(data_var, columns=["Sondaje", "Distancia (h)", "Gamma γ(h)"]).style.format(subset=["Distancia (h)", "Gamma γ(h)"], formatter="{:.4f}"))
+            data_step2.append({
+                "ID": ids[i],
+                "Distancia al Bloque (h)": res['d_vec'][i],
+                "Gamma Bloque γ(h)": res['M'][i] # Estos son los valores del vector M (lado derecho)
+            })
+        # Solo aplicamos formato de decimales a las columnas numéricas, NO al ID
+        st.dataframe(pd.DataFrame(data_step2).style.format(
+            subset=["Distancia al Bloque (h)", "Gamma Bloque γ(h)"], 
+            formatter="{:.4f}"
+        ))
 
-        # --- PASO 3 ---
-        st.markdown("### Paso 3: Ponderación y Ecuación Final")
+        # --- PASO 3: SISTEMA MATRICIAL (VISUALIZACIÓN AVANZADA) ---
+        st.markdown("### 🔹 Paso 3: Resolución del Sistema de Kriging")
+        st.markdown("El sistema de ecuaciones lineales es:")
+        st.latex(r"[K] \cdot [W] = [M]")
+        
+        col_mat1, col_mat2 = st.columns(2)
+        with col_mat1:
+            st.info("Donde [K] es la matriz de covarianzas entre muestras (+ Lagrange):")
+            # Visualizar matriz K si no es gigante
+            if len(df_calc) <= 10:
+                st.write(pd.DataFrame(res['K'], columns=ids+['μ'], index=ids+['μ']).style.background_gradient(cmap='Blues', axis=None).format("{:.3f}"))
+            else:
+                st.warning("Matriz K es muy grande para visualizar completa (N > 10).")
+        
+        with col_mat2:
+            st.info("Donde [M] es la covarianza Muestra-Bloque:")
+            st.write(pd.DataFrame(res['M'], index=ids+['μ'], columns=['Vector M']).style.background_gradient(cmap='Greens').format("{:.3f}"))
+
+        # --- PASO 4: PONDERACIÓN Y RESULTADO ---
+        st.markdown("### 🔹 Paso 4: Obtención de Pesos y Ley Final")
+        
         st.markdown("""
         <div class='math-step'>
-            <b>¿De dónde salió el resultado?</b> Multiplicamos la <b>Ley Real</b> de cada sondaje por su <b>Peso (λ)</b>.
+            Al resolver el sistema matricial, obtenemos los pesos ($\lambda$). 
+            Luego, la Ley Final ($Z^*$) es la suma ponderada de cada ley por su peso:
         </div>
         """, unsafe_allow_html=True)
-        
+
+        # Fórmulas matemáticas renderizadas correctamente
+        c_mat1, c_mat2 = st.columns(2)
+        with c_mat1:
+            st.markdown("**1. Solución Matricial:**")
+            st.latex(r"[W] = [K]^{-1} \cdot [M]")
+        with c_mat2:
+            st.markdown("**2. Ecuación de Estimación:**")
+            st.latex(r"Z^* = \sum_{i=1}^{n} \lambda_i \cdot Z(x_i)")
+
         leyes_reales = df_calc['Ley'].values
         pesos_calc = res['pesos']
         aportes = leyes_reales * pesos_calc
         
-        ecuacion_str = ""
-        for i in range(len(leyes_reales)):
-            simbolo = " + " if i > 0 else ""
-            ecuacion_str += f"{simbolo}({leyes_reales[i]:.2f} × {pesos_calc[i]:.4f})"
-        
-        st.latex(r"Z^* = \sum (\lambda_i \cdot Z_i)")
-        st.write(f"**Sustituyendo tus valores:**")
-        st.markdown(f"`Z* = {ecuacion_str}`")
-        
-        df_w = pd.DataFrame({
+        df_final_weights = pd.DataFrame({
             'Sondaje': ids,
-            'Ley Real (%)': leyes_reales,
-            'Peso (λ)': pesos_calc,
-            'Aporte (%)': aportes
+            'Ley Real (Z)': leyes_reales,
+            'Peso Kriging (λ)': pesos_calc,
+            'Aporte (λ * Z)': aportes
         })
-        #st.dataframe(df_w.style.format(subset=['Ley Real (%)', 'Peso (λ)', 'Aporte (%)'], formatter="{:.4f}").background_gradient(subset=['Peso (λ)'], cmap='Greens'))
-        st.dataframe(df_w)
         
-        total_aporte = np.sum(aportes)
-        st.markdown(f"### 👉 SUMA TOTAL (Z*) = **{total_aporte:.4f} %**")
-
-        # --- PASO 4 ---
-        st.markdown("### Paso 4: Varianza de Kriging")
-        suma_prod = np.sum(res['pesos'] * res['M'][:-1])
-        st.write(f"• Suma (Pesos × Gammas): **{suma_prod:.5f}**")
-        st.write(f"• Multiplicador Lagrange (μ): **{res['mu']:.5f}**")
-        st.success(f"**Varianza Total:** {suma_prod:.5f} + {res['mu']:.5f} = **{res['var']:.4f}**")
+        # Resaltar pesos negativos (Screening effect)
+        def highlight_neg(val):
+            color = 'red' if val < 0 else 'lightgreen'
+            return f'color: {color}; font-weight: bold'
+            
+        # CORRECCIÓN: Aplicamos el formato de 4 decimales SOLO a las columnas numéricas
+        st.dataframe(df_final_weights.style.applymap(highlight_neg, subset=['Peso Kriging (λ)']).format(
+            subset=['Ley Real (Z)', 'Peso Kriging (λ)', 'Aporte (λ * Z)'], 
+            formatter="{:.4f}"
+        ))
+        
+        # Suma final explicita
+        suma_aportes = np.sum(aportes)
+        st.markdown(f"#### ✅ Suma de Aportes = **{suma_aportes:.4f} %** (Coincide con la Ley Estimada)")
+    else:
+        st.info("⚠️ Primero ejecute la estimación en la pestaña 3.")
 
 # ==============================================================================
-# TAB 5: ECONOMÍA
+# TAB 5: ECONOMÍA MINERA
 # ==============================================================================
 with tabs[4]:
     if st.session_state['resultado']:
         res = st.session_state['resultado']
         st.markdown("""
         <div class='theory-box'>
-            <span class='theory-title'>💰 Módulo 5: Valorización Económica</span>
-            Transformamos la Ley Geológica (%) en Valor Económico (US$).
+            <span class='theory-title'>💰 Módulo 5: Valorización Económica del Bloque</span>
+            <p>Un ingeniero de minas no solo estima leyes, estima <b>dinero</b>. Aquí transformamos la variable geológica (%) 
+            en valor monetario (US$), considerando tonelaje, precios y recuperaciones.</p>
         </div>
         """, unsafe_allow_html=True)
         
-        ce1, ce2 = st.columns(2)
+        # Inputs Económicos
+        ce1, ce2, ce3 = st.columns(3)
         with ce1:
-            st.markdown("**Parámetros Económicos:**")
-            dim_x = st.number_input("Largo Bloque (m)", value=25.0)
-            dim_y = st.number_input("Ancho Bloque (m)", value=25.0)
-            dim_z = st.number_input("Alto Bloque (m)", value=15.0)
-            densidad = st.number_input("Densidad (t/m³)", value=2.65)
-            precio = st.number_input("Precio Cobre (US$/lb)", value=3.85)
-            recup = st.number_input("Recuperación (%)", value=85.0)
-            
+            st.markdown("**1. Geometría del Bloque**")
+            dim_x = st.number_input("Largo (m)", value=20.0)
+            dim_y = st.number_input("Ancho (m)", value=20.0)
+            dim_z = st.number_input("Alto (Banco) (m)", value=10.0)
         with ce2:
-            volumen = dim_x * dim_y * dim_z
-            tonelaje = volumen * densidad
-            fino_ton = tonelaje * (res['ley']/100)
-            fino_lb = fino_ton * 2204.62
-            fino_rec_lb = fino_lb * (recup/100)
-            valor_bloque = fino_rec_lb * precio
+            st.markdown("**2. Parámetros Físicos**")
+            densidad = st.number_input("Densidad (t/m³)", value=2.60)
+            recup = st.number_input("Recuperación Metalúrgica (%)", value=88.0)
+        with ce3:
+            st.markdown("**3. Mercado**")
+            precio = st.number_input("Precio del Metal (US$/lb)", value=4.15)
+            costo_minado = st.number_input("Costo Op. Total (US$/t)", value=45.0)
+
+        # Cálculos Económicos
+        volumen = dim_x * dim_y * dim_z
+        tonelaje = volumen * densidad
+        fino_ton = tonelaje * (res['ley']/100)
+        fino_lbs = fino_ton * 2204.62
+        fino_recuperado_lbs = fino_lbs * (recup/100)
+        
+        ingreso_bruto = fino_recuperado_lbs * precio
+        costo_total_bloque = tonelaje * costo_minado
+        profit = ingreso_bruto - costo_total_bloque
+        
+        st.divider()
+        
+        # --- VISUALIZACIÓN DE RESULTADOS FINANCIEROS ---
+        kf1, kf2 = st.columns([1, 1.5])
+        
+        with kf1:
+            st.markdown("### 🧾 Balance Financiero")
+            st.write(f"📦 **Volumen:** {volumen:,.0f} m³")
+            st.write(f"⚖️ **Tonelaje:** {tonelaje:,.0f} t")
+            st.write(f"🧱 **Cobre Fino:** {fino_ton:.2f} t ({fino_lbs:,.0f} lbs)")
+            st.markdown("---")
+            st.write(f"💵 **Ingresos (NSR):** US$ {ingreso_bruto:,.2f}")
+            st.write(f"📉 **Costos:** US$ {costo_total_bloque:,.2f}")
             
-            st.markdown("### Resultados Financieros:")
-            st.write(f"📦 Volumen: **{volumen:,.0f} m³**")
-            st.write(f"⚖️ Tonelaje Mineral: **{tonelaje:,.0f} t**")
-            st.write(f"🧱 Cobre Fino: **{fino_ton:.2f} t** ({fino_lb:,.0f} lbs)")
-            st.divider()
-            st.markdown(f"💵 **Valor In-Situ Estimado:** <span style='color:#00e676; font-size:2em'>US$ {valor_bloque:,.0f}</span>", unsafe_allow_html=True)
+            # Resultado Final Grande
+            color_res = "#00e676" if profit > 0 else "#ff1744"
+            st.markdown(f"### Beneficio Neto:")
+            st.markdown(f"<span style='color:{color_res}; font-size:2.5em; font-weight:bold;'>US$ {profit:,.2f}</span>", unsafe_allow_html=True)
+
+        with kf2:
+            # Gráfico de Cascada (Waterfall) o Pie Chart
+            fig_fin = go.Figure(data=[go.Pie(
+                labels=['Costo Operativo', 'Beneficio Neto' if profit > 0 else 'Pérdida'], 
+                values=[costo_total_bloque, abs(profit)],
+                hole=.4,
+                marker_colors=['#ef5350', '#66bb6a' if profit > 0 else '#b71c1c']
+            )])
+            fig_fin.update_layout(title="Distribución del Valor Económico del Bloque", template="plotly_dark")
+            st.plotly_chart(fig_fin, use_container_width=True)
+            
+            # Análisis de Sensibilidad Rápido
+            st.info(f"El bloque paga sus costos si el precio es > US$ {(costo_total_bloque / fino_recuperado_lbs):.2f} /lb")
+    else:
+        st.info("⚠️ Ejecute primero la estimación.")
 
 # ==============================================================================
-# TAB 6: JORC
+# TAB 6: CLASIFICACIÓN JORC / NI 43-101
 # ==============================================================================
 with tabs[5]:
     if st.session_state['resultado']:
         res = st.session_state['resultado']
         
-        st.markdown("### Clasificación de Recursos (JORC / NI 43-101)")
-        
-        if res['cat'] == "MEDIDO": css="jorc-medido"; icon="🟢"
-        elif res['cat'] == "INDICADO": css="jorc-indicado"; icon="🟡"
-        else: css="jorc-inferido"; icon="🔴"
-        
-        st.markdown(f"""
-        <div class='jorc-card {css}'>
-            <h1 style='margin:0; color:white;'>{icon} {res['cat']}</h1>
-            <p>Coeficiente de Variación Kriging: <b>{res['cv_k']:.2f}%</b></p>
+        st.markdown("""
+        <div class='theory-box'>
+            <span class='theory-title'>⚖️ Módulo 6: Clasificación de Recursos (Estándar Internacional)</span>
+            <p>Para reportar recursos a la bolsa de valores (JORC en Australia, NI 43-101 en Canadá), debemos clasificar la confianza.
+            Usamos el <b>Error Relativo (Coeficiente de Variación del Kriging)</b> como proxy de la incertidumbre.</p>
         </div>
         """, unsafe_allow_html=True)
         
-        # --- NUEVA SECCIÓN EXPLICATIVA VISUAL ---
-        st.markdown("### 📊 Gráfico de Certeza (Gauge Chart)")
+        # Determinar estilos según categoría
+        if res['cat'] == "MEDIDO": 
+            css_class="jorc-medido"
+            icon="🟢"
+            msg_auditor = "Alta confianza geológica. Se permite planificación minera detallada y conversión a Reservas Probadas."
+        elif res['cat'] == "INDICADO": 
+            css_class="jorc-indicado"
+            icon="🟡"
+            msg_auditor = "Confianza razonable. Permite planificación general y conversión a Reservas Probables."
+        else: 
+            css_class="jorc-inferido"
+            icon="🔴"
+            msg_auditor = "Baja confianza. Solo para evaluación preliminar. NO se puede convertir a Reservas ni usar en plan minero."
         
-        fig_gauge = go.Figure(go.Indicator(
-            mode = "gauge+number+delta",
-            value = res['cv_k'],
-            domain = {'x': [0, 1], 'y': [0, 1]},
-            title = {'text': "Coeficiente de Variación (CV)", 'font': {'size': 24, 'color': 'white'}},
-            delta = {'reference': 15, 'increasing': {'color': "red"}, 'decreasing': {'color': "green"}},
-            gauge = {
-                'axis': {'range': [None, max(50, res['cv_k'] + 10)], 'tickwidth': 1, 'tickcolor': "white"},
-                'bar': {'color': "white"},
-                'bgcolor': "#1a2332",
-                'borderwidth': 2,
-                'bordercolor': "gray",
-                'steps': [
-                    {'range': [0, 15], 'color': "#1b5e20"},  # Medido
-                    {'range': [15, 30], 'color': "#f57f17"}, # Indicado
-                    {'range': [30, 1000], 'color': "#b71c1c"} # Inferido
-                ],
-            }
-        ))
-        fig_gauge.update_layout(paper_bgcolor="#0e1117", font={'color': "white"}, height=300)
-        st.plotly_chart(fig_gauge, use_container_width=True)
+        # Tarjeta Principal JORC
+        st.markdown(f"""
+        <div class='jorc-card {css_class}'>
+            <h2 style='color:white; margin:0; text-shadow: 2px 2px 4px rgba(0,0,0,0.5);'>{icon} RECURSO {res['cat']}</h2>
+            <h4 style="color:white; margin-top:10px;">Coeficiente de Variación (CV): {res['cv_k']:.2f}%</h4>
+        </div>
+        """, unsafe_allow_html=True)
+        
+        col_j1, col_j2 = st.columns([1, 1])
+        
+        with col_j1:
+            st.markdown("### 📉 Gráfico de Incertidumbre")
+            
+            fig_gauge = go.Figure(go.Indicator(
+                mode = "gauge+number+delta",
+                value = res['cv_k'],
+                domain = {'x': [0, 1], 'y': [0, 1]},
+                title = {'text': "Error Relativo de Estimación (%)", 'font': {'size': 20}},
+                delta = {'reference': 15, 'increasing': {'color': "red"}, 'decreasing': {'color': "green"}},
+                gauge = {
+                    'axis': {'range': [None, 50], 'tickwidth': 1, 'tickcolor': "white"},
+                    'bar': {'color': "white", 'thickness': 0.3},
+                    'bgcolor': "#121212",
+                    'steps': [
+                        {'range': [0, 15], 'color': "#2e7d32"},   # Medido
+                        {'range': [15, 30], 'color': "#ef6c00"},  # Indicado
+                        {'range': [30, 100], 'color': "#c62828"}   # Inferido
+                    ],
+                    'threshold': {
+                        'line': {'color': "white", 'width': 4},
+                        'thickness': 0.75,
+                        'value': res['cv_k']
+                    }
+                }
+            ))
+            fig_gauge.update_layout(height=350, margin=dict(l=20,r=20,t=50,b=20), paper_bgcolor="#0e1117", font={'color': "white"})
+            st.plotly_chart(fig_gauge, use_container_width=True)
 
-        # --- EXPLICACIÓN DE RESULTADO ---
-        c1, c2 = st.columns(2)
-        with c1:
-            st.markdown("**Parámetros de Entrada:**")
-            st.write(f"- Ley Estimada ($Z^*$): **{res['ley']:.4f}%**")
-            st.write(f"- Desviación Estándar ($\sigma_k$): **{res['sigma']:.4f}**")
-        with c2:
-            st.markdown("**Cálculo del CV:**")
-            st.latex(r"CV = \frac{\sigma_k}{Z^*} \times 100")
-            st.markdown(f"$$CV = \\frac{{{res['sigma']:.4f}}}{{{res['ley']:.4f}}} \\times 100 = \\mathbf{{{res['cv_k']:.2f}\\%}}$$")
-        
-        st.markdown("---")
-        st.markdown("**Veredicto del Auditor:**")
-        if res['cv_k'] < 15:
-            st.success(f"Como el CV ({res['cv_k']:.2f}%) es menor al 15%, el recurso se clasifica como **MEDIDO**.")
-        elif res['cv_k'] <= 30:
-            st.warning(f"Como el CV ({res['cv_k']:.2f}%) está entre 15% y 30%, el recurso se clasifica como **INDICADO**.")
-        else:
-            st.error(f"Como el CV ({res['cv_k']:.2f}%) es mayor al 30%, el recurso se clasifica como **INFERIDO**. Existe mucha incertidumbre.")
+        with col_j2:
+            st.markdown("### 📋 Criterios del Código")
+            st.table(pd.DataFrame({
+                'Categoría': ['MEDIDO', 'INDICADO', 'INFERIDO'],
+                'CV Kriging (%)': ['< 15%', '15% - 30%', '> 30%'],
+                'Nivel de Riesgo': ['Bajo', 'Moderado', 'Alto']
+            }).set_index('Categoría'))
+
+            # --- NUEVA EXPLICACIÓN DIDÁCTICA DEL CV ---
+            st.markdown("---")
+            st.subheader("🧮 Detalle del Cálculo: Coeficiente de Variación (CV)")
+            st.markdown("El CV mide la incertidumbre relativa. Se calcula dividiendo la desviación estándar del Kriging entre la ley estimada.")
+            
+            # Fórmula general
+            st.latex(r"CV (\%) = \left( \frac{\sigma_{kriging}}{Z^*_{estimado}} \right) \times 100")
+            
+            # Reemplazo con números reales
+            st.info(f"""
+            **Reemplazando con tus datos:**
+            
+            $$ CV = \\frac{{{res['sigma']:.4f}}}{{{res['ley']:.4f}}} \\times 100 = \\mathbf{{{res['cv_k']:.2f}\\%}} $$
+            
+            *Interpretación: El error es el {res['cv_k']:.2f}% del valor estimado.*
+            """)
+            
+            st.markdown(f"""
+            <div class='result-box'>
+                <b>👨‍⚖️ Veredicto del Auditor:</b><br>
+                {msg_auditor}
+            </div>
+            """, unsafe_allow_html=True)
+    else:
+        st.info("⚠️ Ejecute primero la estimación.")
 
 # ==============================================================================
-# TAB 7: INFORME FINAL
+# TAB 7: INFORME FINAL (GENERACIÓN DE REPORTE)
 # ==============================================================================
 with tabs[6]:
     if st.session_state['resultado']:
         res = st.session_state['resultado']
-        fecha = datetime.now().strftime("%d/%m/%Y")
         
-        st.markdown("### 📄 Generador de Reporte Oficial")
-        st.markdown("Haz clic abajo para descargar el informe completo en formato imprimible.")
+        st.markdown("### 📄 Generador de Reporte Técnico Oficial")
+        st.markdown("Este módulo genera un informe HTML listo para imprimir o guardar como PDF, incluyendo todas las evidencias del cálculo.")
         
-        ic_90 = 1.645 * res['sigma']
+        # --- PREPARACIÓN DE DATOS PARA HTML ---
+        fecha_str = datetime.now().strftime("%d de %B de %Y")
         
+        # Generar filas de la tabla de ponderación para el HTML
         filas_html = ""
+        ids = df_calc['Id'].tolist() if 'Id' in df_calc.columns else [str(i) for i in range(len(df_calc))]
+        
         for i in range(len(df_calc)):
             filas_html += f"""
             <tr>
-                <td>{ids[i]}</td>
-                <td>{res['d_vec'][i]:.2f}</td>
-                <td>{res['M'][i]:.4f}</td>
-                <td>{res['pesos'][i]:.4f}</td>
-                <td>{df_calc['Ley'].values[i]:.2f}</td>
-                <td><b>{(df_calc['Ley'].values[i] * res['pesos'][i]):.4f}</b></td>
+                <td style="padding:8px; border:1px solid #ddd;">{ids[i]}</td>
+                <td style="padding:8px; border:1px solid #ddd;">{res['d_vec'][i]:.2f}</td>
+                <td style="padding:8px; border:1px solid #ddd;">{res['M'][i]:.4f}</td>
+                <td style="padding:8px; border:1px solid #ddd;">{res['pesos'][i]:.4f}</td>
+                <td style="padding:8px; border:1px solid #ddd;">{df_calc['Ley'].iloc[i]:.2f}</td>
+                <td style="padding:8px; border:1px solid #ddd; background-color:#f9f9f9;"><b>{(df_calc['Ley'].iloc[i] * res['pesos'][i]):.4f}</b></td>
             </tr>
             """
+        
+        # Lista de estudiantes formateada
+        estudiantes_str = "<br>".join([f"• {s}" for s in st.session_state['student_names']])
 
+        # --- PLANTILLA HTML DEL REPORTE ---
         reporte_html = f"""
-        <div style="font-family: 'Arial', sans-serif; color: black; background: white; padding: 50px; border: 1px solid #ccc; max-width: 800px; margin: auto;">
-            <div style="text-align:center; border-bottom: 2px solid #0277bd; padding-bottom: 10px; margin-bottom: 20px;">
-                <h2 style="color: #0277bd; margin:0;">INFORME TÉCNICO DE RECURSOS</h2>
-                <h4 style="margin:5px 0;">PROYECTO MINERO POMPERIA S.A.C.</h4>
+        <html>
+        <head>
+            <style>
+                body {{ font-family: 'Arial', sans-serif; color: #333; line-height: 1.6; }}
+                .container {{ width: 100%; max-width: 800px; margin: 0 auto; padding: 40px; border: 1px solid #ccc; background: white; }}
+                .header {{ text-align: center; border-bottom: 3px solid #0277bd; padding-bottom: 20px; margin-bottom: 30px; }}
+                .logo {{ font-size: 24px; font-weight: bold; color: #0277bd; }}
+                .meta-table {{ width: 100%; margin-bottom: 30px; border-collapse: collapse; }}
+                .meta-table td {{ padding: 10px; vertical-align: top; }}
+                h2, h3 {{ color: #01579b; border-bottom: 1px solid #eee; padding-bottom: 10px; }}
+                .result-block {{ background-color: #e1f5fe; padding: 20px; border-left: 5px solid #0288d1; margin: 20px 0; }}
+                .data-table {{ width: 100%; border-collapse: collapse; font-size: 12px; margin-top: 10px; }}
+                .data-table th {{ background-color: #0277bd; color: white; padding: 8px; text-align: center; }}
+                .footer {{ margin-top: 50px; text-align: center; font-size: 12px; color: #777; border-top: 1px solid #ccc; padding-top: 20px; }}
+                .signatures {{ display: flex; justify-content: space-between; margin-top: 80px; }}
+                .sig-box {{ text-align: center; width: 40%; border-top: 1px solid black; padding-top: 10px; }}
+            </style>
+        </head>
+        <body>
+            <div class="container">
+                <div class="header">
+                    <div class="logo">UNIVERSIDAD NACIONAL DEL ALTIPLANO</div>
+                    <div>FACULTAD DE INGENIERÍA DE MINAS</div>
+                    <h3>INFORME TÉCNICO DE ESTIMACIÓN DE RECURSOS</h3>
+                </div>
+
+                <table class="meta-table">
+                    <tr>
+                        <td width="50%">
+                            <b>PROYECTO:</b> {st.session_state['project_name']}<br>
+                            <b>FECHA:</b> {fecha_str}<br>
+                            <b>CURSO:</b> GEOESTADÍSTICA
+                        </td>
+                        <td width="50%" style="text-align:right;">
+                            <b>DOCENTE:</b> {st.session_state['docente_name']}<br>
+                            <b>ESTUDIANTES:</b><br>
+                            {estudiantes_str}
+                        </td>
+                    </tr>
+                </table>
+
+                <h2>1. RESUMEN EJECUTIVO</h2>
+                <p>Se ha realizado la estimación de ley para el bloque centrado en <b>X: {res['tx']}, Y: {res['ty']}</b> utilizando el método de Kriging Ordinario.</p>
+                
+                <div class="result-block">
+                    <ul>
+                        <li><b>Ley Estimada (Z*):</b> {res['ley']:.4f} %</li>
+                        <li><b>Varianza Kriging (σ²k):</b> {res['var']:.4f}</li>
+                        <li><b>Coef. Variación (CV):</b> {res['cv_k']:.2f} %</li>
+                        <li><b>Categoría JORC:</b> {res['cat']}</li>
+                    </ul>
+                </div>
+
+                <h2>2. PARÁMETROS DE ESTIMACIÓN</h2>
+                <p>Modelo Variográfico utilizado (Esférico):</p>
+                <ul>
+                    <li><b>Nugget (C0):</b> {res['c0']}</li>
+                    <li><b>Sill (C0+C1):</b> {res['c0'] + res['c1']}</li>
+                    <li><b>Rango (a):</b> {res['a']} m</li>
+                </ul>
+
+                <h2>3. MEMORIA DE CÁLCULO (TRAZABILIDAD)</h2>
+                <table class="data-table">
+                    <thead>
+                        <tr>
+                            <th>ID</th><th>Distancia (m)</th><th>Gamma γ(h)</th><th>Peso (λ)</th><th>Ley Real</th><th>Aporte</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {filas_html}
+                    </tbody>
+                </table>
+
+                <h2>4. CONCLUSIONES</h2>
+                <p>El bloque presenta una incertidumbre relativa del {res['cv_k']:.2f}%, lo cual lo clasifica como recurso <b>{res['cat']}</b>. 
+                {"Se recomienda continuar con el plan de minado." if res['cat'] != "INFERIDO" else "Se recomienda realizar perforación infill para mejorar la categoría."}</p>
+
+                <div class="signatures">
+                    <div class="sig-box">
+                        <b>{st.session_state['docente_name']}</b><br>
+                        Docente Supervisor
+                    </div>
+                    <div class="sig-box">
+                        <b>Responsable del Proyecto</b><br>
+                        FIM - UNA Puno
+                    </div>
+                </div>
+
+                <div class="footer">
+                    Generado automáticamente por Sistema Kriging Pro v2.0 | Felix Bautista - UNA Puno - Semestre 2025-II
+                </div>
             </div>
-            
-            <table style="width:100%; margin-bottom:20px;">
-                <tr>
-                    <td><b>Fecha:</b> {fecha}</td>
-                    <td style="text-align:right;"><b>estudiante:</b> Felix Bautista Layme</td>
-                </tr>
-            </table>
-            
-            <h3 style="color:#333; border-bottom:1px solid #ccc;">1. RESUMEN EJECUTIVO</h3>
-            <p>Se certifica la estimación de ley para el bloque de explotación ubicado en las coordenadas locales <b>X:{res['tx']}, Y:{res['ty']}</b>.</p>
-            <ul style="background-color:#f5f5f5; padding:15px; border-left:5px solid #0277bd; list-style-type:none;">
-                <li>💎 <b>Ley Estimada (Z*):</b> {res['ley']:.4f} %</li>
-                <li>📉 <b>Varianza Kriging:</b> {res['var']:.4f}</li>
-                <li>📋 <b>Categoría JORC:</b> {res['cat']}</li>
-            </ul>
-            
-            <h3 style="color:#333; border-bottom:1px solid #ccc;">2. MEMORIA DE CÁLCULO</h3>
-            <p>Detalle de la ponderación de leyes:</p>
-            <table border="1" cellpadding="8" cellspacing="0" style="width:100%; border-collapse:collapse; text-align:center; font-size:0.9em;">
-                <tr style="background:#0277bd; color:white;">
-                    <th>Sondaje</th><th>Distancia (m)</th><th>Gamma (h)</th><th>Peso (λ)</th><th>Ley Real (%)</th><th>Aporte (%)</th>
-                </tr>
-                {filas_html}
-                <tr style="background:#e0f7fa; font-weight:bold;">
-                    <td colspan="5" style="text-align:right;">LEY ESTIMADA TOTAL (Z*):</td>
-                    <td>{res['ley']:.4f}</td>
-                </tr>
-            </table>
-            
-            <h3 style="color:#333; border-bottom:1px solid #ccc;">3. ECONOMÍA Y RIESGO</h3>
-            <p>Considerando un precio de <b>{precio} US$/lb</b>:</p>
-            <ul>
-                <li>Valor In-Situ del Bloque: <b>US$ {valor_bloque:,.2f}</b></li>
-                <li>Incertidumbre (IC 90%): La ley real está entre <b>{res['ley'] - ic_90:.3f}%</b> y <b>{res['ley'] + ic_90:.3f}%</b>.</li>
-            </ul>
-            
-            <h3 style="color:#333; border-bottom:1px solid #ccc;">4. CONCLUSIONES</h3>
-            <p>El bloque ha sido clasificado como <b>{res['cat']}</b> con un coeficiente de variación del {res['cv_k']:.2f}%. 
-            {"Se recomienda su incorporación inmediata al plan de minado." if res['cat'] != "INFERIDO" else "El riesgo es alto. Se requiere campaña de infill drilling."}</p>
-            
-            <br><br><br>
-            <div style="text-align:center;">
-                <p>__________________________</p>
-                <p><b>Felix Bautista Layme</b><br>Firma del Responsable</p>
-            </div>
-        </div>
+        </body>
+        </html>
         """
         
+        # Renderizar vista previa y botón de descarga
         st.components.v1.html(reporte_html, height=800, scrolling=True)
+        
         b64 = base64.b64encode(reporte_html.encode()).decode()
-        href = f'<a href="data:text/html;base64,{b64}" download="Informe_Tecnico_Oficial.html"><button style="background:#d32f2f; color:white; padding:12px 25px; border:none; border-radius:5px; cursor:pointer; font-size:1.1em; margin-top:10px;">📥 DESCARGAR INFORME OFICIAL (PDF)</button></a>'
-
+        href = f'<a href="data:text/html;base64,{b64}" download="Informe_Kriging_{st.session_state["project_name"].replace(" ", "_")}.html"><button style="background:#d32f2f; color:white; padding:15px 30px; border:none; border-radius:5px; cursor:pointer; font-size:1.2em; font-weight:bold; margin-top:20px; width:100%;">📥 DESCARGAR INFORME OFICIAL (FORMATO WEB/PDF)</button></a>'
         st.markdown(href, unsafe_allow_html=True)
-
+    else:
+        st.info("⚠️ Para generar el informe, primero debe realizar una estimación en la Pestaña 3.")
