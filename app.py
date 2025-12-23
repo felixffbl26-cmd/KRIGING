@@ -457,22 +457,29 @@ with st.sidebar:
         **V - Varianza de Kriging:** Error de estimación asociado al bloque.
         """, unsafe_allow_html=True)
     
+    st.markdown("---")
+    st.info("""
+    **🚀 GUÍA DE USO:**
+    Sigue las **7 Pestañas** en orden superior.
+    
+    ⚠️ **IMPORTANTE:** Al finalizar, ve a la pestaña **'7. Informe'** para descargar tu reporte final.
+    """)
     st.success("✅ **Sistema en Línea**")
     st.markdown("<div style='text-align:center; color:#555; font-size:0.8em;'>v2.0 Build 2025</div>", unsafe_allow_html=True)
 
 # --- CABECERA PRINCIPAL ---
 st.title(f"{st.session_state['project_name']}")
-st.markdown(f"#### Simulador Profesional de Estimación de Recursos Minerales | Curso de Geoestadística")
+st.markdown(f"#### Simulador de Estimación de Recursos Minerales con Kriging | Curso de Geoestadística Minera")
 
-# Definición de Pestañas
+# Definición de Pestañas (Nombres cortos para que se vean todos en pantalla)
 tabs = st.tabs([
-    "📊 1. ANÁLISIS DE DATOS (QA/QC)", 
-    "📈 2. VARIOGRAFÍA ESTRUCTURAL", 
-    "⚙️ 3. ESTIMACIÓN (KRIGING)", 
-    "🧮 4. INGENIERÍA INVERSA (WHITE BOX)",
-    "💰 5. ECONOMÍA MINERA",
-    "⚖️ 6. CLASIFICACIÓN JORC", 
-    "📜 7. INFORME OFICIAL"
+    "📊 1. Datos", 
+    "📈 2. Variograma", 
+    "⚙️ 3. Kriging", 
+    "🧮 4. Calculos",
+    "💰 5. Economía",
+    "⚖️ 6. JORC", 
+    "📜 7. Informe"
 ])
 
 # ==============================================================================
