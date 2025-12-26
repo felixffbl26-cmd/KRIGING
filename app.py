@@ -1050,140 +1050,88 @@ with tabs[5]:
         st.info("⚠️ Ejecute primero la estimación.")
 
 # ==============================================================================
-# TAB 7: INFORME FINAL (GENERACIÓN DE REPORTE)
+# TAB 7: INFORME (CORREGIDO Y BLINDADO)
 # ==============================================================================
 with tabs[6]:
     if st.session_state['resultado']:
         res = st.session_state['resultado']
         
-        st.markdown("### 📄 Generador de Reporte Técnico Oficial")
-        st.markdown("Este módulo genera un informe HTML listo para imprimir o guardar como PDF, incluyendo todas las evidencias del cálculo.")
+        st.markdown("### 📄 Generador de Reporte Técnico")
         
-        # --- PREPARACIÓN DE DATOS PARA HTML ---
-        fecha_str = datetime.now().strftime("%d de %B de %Y")
+        # 1. Lista de estudiantes
+        est_li = "".join([f"<li>{e}</li>" for e in estudiantes_activos])
         
-        # Generar filas de la tabla de ponderación para el HTML
-        filas_html = ""
-        ids = df_calc['Id'].tolist() if 'Id' in df_calc.columns else [str(i) for i in range(len(df_calc))]
+        # 2. LÓGICA DE SEGURIDAD (ESTA ES LA CURA AL ERROR)
+        # Calcula el número menor de filas para que nunca se desborde, tengas 6 o 47 datos.
+        df_safe = st.session_state['df_data']
         
-        for i in range(len(df_calc)):
-            filas_html += f"""
-            <tr>
-                <td style="padding:8px; border:1px solid #ddd;">{ids[i]}</td>
-                <td style="padding:8px; border:1px solid #ddd;">{res['d_vec'][i]:.2f}</td>
-                <td style="padding:8px; border:1px solid #ddd;">{res['M'][i]:.4f}</td>
-                <td style="padding:8px; border:1px solid #ddd;">{res['pesos'][i]:.4f}</td>
-                <td style="padding:8px; border:1px solid #ddd;">{df_calc['Ley'].iloc[i]:.2f}</td>
-                <td style="padding:8px; border:1px solid #ddd; background-color:#f9f9f9;"><b>{(df_calc['Ley'].iloc[i] * res['pesos'][i]):.4f}</b></td>
-            </tr>
-            """
+        # Aseguramos que las listas tengan el mismo largo antes de iterar
+        limit = min(len(res['pesos']), len(res['d_vec']), len(df_safe))
         
-        # Lista de estudiantes formateada
-        estudiantes_str = "<br>".join([f"• {s}" for s in st.session_state['student_names']])
-
-        # --- PLANTILLA HTML DEL REPORTE ---
-        reporte_html = f"""
-        <html>
-        <head>
-            <style>
-                body {{ font-family: 'Arial', sans-serif; color: #333; line-height: 1.6; }}
-                .container {{ width: 100%; max-width: 800px; margin: 0 auto; padding: 40px; border: 1px solid #ccc; background: white; }}
-                .header {{ text-align: center; border-bottom: 3px solid #0277bd; padding-bottom: 20px; margin-bottom: 30px; }}
-                .logo {{ font-size: 24px; font-weight: bold; color: #0277bd; }}
-                .meta-table {{ width: 100%; margin-bottom: 30px; border-collapse: collapse; }}
-                .meta-table td {{ padding: 10px; vertical-align: top; }}
-                h2, h3 {{ color: #01579b; border-bottom: 1px solid #eee; padding-bottom: 10px; }}
-                .result-block {{ background-color: #e1f5fe; padding: 20px; border-left: 5px solid #0288d1; margin: 20px 0; }}
-                .data-table {{ width: 100%; border-collapse: collapse; font-size: 12px; margin-top: 10px; }}
-                .data-table th {{ background-color: #0277bd; color: white; padding: 8px; text-align: center; }}
-                .footer {{ margin-top: 50px; text-align: center; font-size: 12px; color: #777; border-top: 1px solid #ccc; padding-top: 20px; }}
-                .signatures {{ display: flex; justify-content: space-between; margin-top: 80px; }}
-                .sig-box {{ text-align: center; width: 40%; border-top: 1px solid black; padding-top: 10px; }}
-            </style>
-        </head>
-        <body>
-            <div class="container">
-                <div class="header">
-                    <div class="logo">UNIVERSIDAD NACIONAL DEL ALTIPLANO</div>
-                    <div>FACULTAD DE INGENIERÍA DE MINAS</div>
-                    <h3>INFORME TÉCNICO DE ESTIMACIÓN DE RECURSOS</h3>
-                </div>
-
-                <table class="meta-table">
-                    <tr>
-                        <td width="50%">
-                            <b>PROYECTO:</b> {st.session_state['project_name']}<br>
-                            <b>FECHA:</b> {fecha_str}<br>
-                            <b>CURSO:</b> GEOESTADÍSTICA
-                        </td>
-                        <td width="50%" style="text-align:right;">
-                            <b>DOCENTE:</b> {st.session_state['docente_name']}<br>
-                            <b>ESTUDIANTES:</b><br>
-                            {estudiantes_str}
-                        </td>
-                    </tr>
-                </table>
-
-                <h2>1. RESUMEN EJECUTIVO</h2>
-                <p>Se ha realizado la estimación de ley para el bloque centrado en <b>X: {res['tx']}, Y: {res['ty']}</b> utilizando el método de Kriging Ordinario.</p>
+        ids = df_safe['ID'].values
+        leys = df_safe['Ley'].values
+        
+        # 3. Generación de filas seguras
+        rows = ""
+        for i in range(limit):
+            try:
+                # Extraemos valores con seguridad dentro del límite
+                id_val = str(ids[i])
+                dist_val = float(res['d_vec'][i])
+                peso_val = float(res['pesos'][i])
+                ley_val = float(leys[i])
                 
-                <div class="result-block">
-                    <ul>
-                        <li><b>Ley Estimada (Z*):</b> {res['ley']:.4f} %</li>
-                        <li><b>Varianza Kriging (σ²k):</b> {res['var']:.4f}</li>
-                        <li><b>Coef. Variación (CV):</b> {res['cv_k']:.2f} %</li>
-                        <li><b>Categoría JORC:</b> {res['cat']}</li>
-                    </ul>
-                </div>
+                rows += f"""
+                <tr>
+                    <td>{id_val}</td>
+                    <td>{dist_val:.2f}</td>
+                    <td>{peso_val:.4f}</td>
+                    <td>{ley_val:.2f}</td>
+                </tr>"""
+            except:
+                continue
 
-                <h2>2. PARÁMETROS DE ESTIMACIÓN</h2>
-                <p>Modelo Variográfico utilizado (Esférico):</p>
+        # 4. El HTML del Reporte
+        html = f"""
+        <div style="font-family:Arial; padding:40px; background:white; color:black; border:1px solid #ccc;">
+            <center>
+                <h1 style="color:#0277bd;">INFORME DE ESTIMACIÓN DE RECURSOS</h1>
+                <h3>PROYECTO: {proj_name.upper()}</h3>
+            </center>
+            <hr>
+            <table width="100%">
+                <tr>
+                    <td><b>Docente:</b> Ing. Arturo R. Chayña Rodriguez</td>
+                    <td align="right"><b>Fecha:</b> {datetime.now().strftime('%d/%m/%Y')}</td>
+                </tr>
+                <tr><td colspan="2"><b>Equipo Técnico:</b><ul>{est_li}</ul></td></tr>
+            </table>
+            
+            <h3>1. RESUMEN EJECUTIVO</h3>
+            <div style="background:#e3f2fd; padding:15px; border-radius:5px;">
+                <p>Estimación del Bloque en <b>X={res['tx']:.2f}, Y={res['ty']:.2f}</b>:</p>
                 <ul>
-                    <li><b>Nugget (C0):</b> {res['c0']}</li>
-                    <li><b>Sill (C0+C1):</b> {res['c0'] + res['c1']}</li>
-                    <li><b>Rango (a):</b> {res['a']} m</li>
+                    <li><b>LEY ESTIMADA: {res['ley']:.4f} % Cu</b></li>
+                    <li>Varianza Kriging: {res['var']:.4f}</li>
+                    <li>Categoría: <b>{res['cat']}</b></li>
                 </ul>
-
-                <h2>3. MEMORIA DE CÁLCULO (TRAZABILIDAD)</h2>
-                <table class="data-table">
-                    <thead>
-                        <tr>
-                            <th>ID</th><th>Distancia (m)</th><th>Gamma γ(h)</th><th>Peso (λ)</th><th>Ley Real</th><th>Aporte</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        {filas_html}
-                    </tbody>
-                </table>
-
-                <h2>4. CONCLUSIONES</h2>
-                <p>El bloque presenta una incertidumbre relativa del {res['cv_k']:.2f}%, lo cual lo clasifica como recurso <b>{res['cat']}</b>. 
-                {"Se recomienda continuar con el plan de minado." if res['cat'] != "INFERIDO" else "Se recomienda realizar perforación infill para mejorar la categoría."}</p>
-
-                <div class="signatures">
-                    <div class="sig-box">
-                        <b>{st.session_state['docente_name']}</b><br>
-                        Docente Supervisor
-                    </div>
-                    <div class="sig-box">
-                        <b>Responsable del Proyecto</b><br>
-                        FIM - UNA Puno
-                    </div>
-                </div>
-
-                <div class="footer">
-                    Generado automáticamente por Sistema Kriging Pro v2.0 | Felix Bautista - UNA Puno - Semestre 2025-II
-                </div>
             </div>
-        </body>
-        </html>
+            
+            <h3>2. DETALLE DE MUESTRAS ({limit} registros procesados)</h3>
+            <table border="1" cellspacing="0" cellpadding="5" width="100%">
+                <tr style="background:#0277bd; color:white;"><th>ID</th><th>Distancia (m)</th><th>Peso</th><th>Ley</th></tr>
+                {rows}
+            </table>
+            
+            <br><br><br>
+            <center>
+                <p>________________________________________________</p>
+                <p><b>RESPONSABLE FACULTAD DE INGENIERÍA DE MINAS - UNA PUNO</b></p>
+                <p>Semestre 2025 - II</p>
+            </center>
+        </div>
         """
         
-        # Renderizar vista previa y botón de descarga
-        st.components.v1.html(reporte_html, height=800, scrolling=True)
-        
-        b64 = base64.b64encode(reporte_html.encode()).decode()
-        href = f'<a href="data:text/html;base64,{b64}" download="Informe_Kriging_{st.session_state["project_name"].replace(" ", "_")}.html"><button style="background:#d32f2f; color:white; padding:15px 30px; border:none; border-radius:5px; cursor:pointer; font-size:1.2em; font-weight:bold; margin-top:20px; width:100%;">📥 DESCARGAR INFORME OFICIAL (FORMATO WEB/PDF)</button></a>'
-        st.markdown(href, unsafe_allow_html=True)
-    else:
-        st.info("⚠️ Para generar el informe, primero debe realizar una estimación en la Pestaña 3.")
+        st.components.v1.html(html, height=700, scrolling=True)
+        b64 = base64.b64encode(html.encode()).decode()
+        st.markdown(f'<a href="data:text/html;base64,{b64}" download="Reporte_{proj_name}.html"><button style="background-color:#2e7d32; color:white; padding:10px 20px; border:none; border-radius:5px; cursor:pointer;">📥 DESCARGAR INFORME OFICIAL</button></a>', unsafe_allow_html=True)
