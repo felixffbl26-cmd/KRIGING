@@ -1050,10 +1050,15 @@ with tabs[5]:
         st.info("⚠️ Ejecute primero la estimación.")
 
 # ==============================================================================
-# TAB 7: INFORME (BLINDADO CONTRA TODOS LOS ERRORES)
+# TAB 7: INFORME (VERSIÓN TODO TERRENO - DATA DINÁMICA)
 # ==============================================================================
 with tabs[6]:
-    # 1. VERIFICACIÓN DE EXISTENCIA DE RESULTADOS
+    # 1. RECUPERACIÓN SEGURA DE VARIABLES GLOBALES
+    # Recuperamos nombre del proyecto y estudiantes directamente de los inputs o defaults
+    safe_proj_name = proj_name if 'proj_name' in locals() else "PROYECTO SIN NOMBRE"
+    safe_estudiantes = estudiantes_activos if 'estudiantes_activos' in locals() else ["Equipo Técnico"]
+
+    # 2. VERIFICACIÓN DE CÁLCULO
     if st.session_state.get('resultado') is None:
         st.info("⚠️ Aún no has realizado ninguna estimación. Ve a la Pestaña 3 y calcula.")
     
@@ -1061,37 +1066,28 @@ with tabs[6]:
         res = st.session_state['resultado']
         df_safe = st.session_state['df_data']
         
-        # 2. ESCUDO CONTRA DESAJUSTE DE DATOS (IndexError)
-        # Si tienes 47 datos en Excel pero el cálculo viejo tenía 6, esto DETIENE el error.
+        # 3. ESCUDO DE DESINCRONIZACIÓN (CRÍTICO)
+        # Si tienes 47 datos pero el cálculo guardado es de 6, DETENEMOS el script.
+        # Esto evita el IndexError y obliga a recalcular.
         if len(df_safe) != len(res['d_vec']):
-            st.warning("⚠️ **¡ATENCIÓN!** Has cargado nuevos datos pero no has actualizado el cálculo.")
-            st.error(f"Datos actuales: {len(df_safe)} muestras | Cálculo guardado: {len(res['d_vec'])} muestras.")
-            st.markdown("👉 **SOLUCIÓN:** Ve a la **Pestaña 3 (Estimación)** y haz clic de nuevo en **'🚀 EJECUTAR KRIGING'**.")
-            st.stop() # Detiene la ejecución aquí para que no salga el error rojo feo.
-
-        # 3. ESCUDO CONTRA VARIABLES FALTANTES (NameError)
-        # Si la lista de estudiantes se perdió, creamos una genérica.
-        if 'estudiantes_activos' not in locals() and 'estudiantes_activos' not in globals():
-            estudiantes_activos = ["Equipo Técnico (Sin nombres)"]
-
-        # 4. ESCUDO CONTRA NOMBRES DE COLUMNAS (KeyError)
-        # Busca la columna ID sea como sea que se escriba
-        col_id = next((c for c in ['ID', 'Id', 'id', 'Muestra'] if c in df_safe.columns), df_safe.columns[0])
-        col_ley = next((c for c in ['Ley', 'LEY', 'ley', 'Grade'] if c in df_safe.columns), df_safe.columns[-1])
+            st.warning("⚠️ **DATOS NO SINCRONIZADOS**")
+            st.error(f"Tienes {len(df_safe)} muestras cargadas, pero el cálculo actual es de {len(res['d_vec'])} muestras.")
+            st.markdown("### 👉 SOLUCIÓN: Ve a la pestaña **'3. Estimación'** y haz clic en **'🚀 EJECUTAR KRIGING'** para actualizar.")
+            st.stop() # Freno de emergencia para no mostrar errores rojos
 
         st.markdown("### 📄 Generador de Reporte Técnico")
         
-        # Generar lista HTML de estudiantes
-        est_li = "".join([f"<li>{e}</li>" for e in estudiantes_activos])
-        
-        # 5. GENERACIÓN SEGURA DE LA TABLA
+        # 4. GENERACIÓN DE TABLA ROBUSTA (SIN KEY ERRORS)
+        # Usamos .iloc para acceder por posición (columna 0 y ultima), no por nombre.
+        # Así no importa si tu excel dice "id", "ID", "Muestra" o "Ley", "Grade", "Cu".
         rows = ""
-        # Usamos iteración segura
         for i in range(len(df_safe)):
             try:
-                # Obtenemos valores con seguridad
-                val_id = str(df_safe[col_id].iloc[i])
-                val_ley = float(df_safe[col_ley].iloc[i])
+                # Acceso por posición: Columna 0 es ID, Columna -1 es Ley (Estándar minero)
+                val_id = str(df_safe.iloc[i, 0]) 
+                val_ley = float(df_safe.iloc[i, -1]) 
+                
+                # Datos del cálculo
                 val_dist = float(res['d_vec'][i])
                 val_peso = float(res['pesos'][i])
                 
@@ -1103,14 +1099,17 @@ with tabs[6]:
                     <td style="border: 1px solid #ddd; padding: 8px;">{val_ley:.2f}</td>
                 </tr>"""
             except Exception:
-                continue # Si una fila falla, la ignora y sigue
+                continue # Si una fila está corrupta, la salta y sigue
 
-        # HTML del Reporte
+        # Lista de estudiantes HTML
+        est_li = "".join([f"<li>{e}</li>" for e in safe_estudiantes])
+
+        # 5. HTML DEL REPORTE (CON VARIABLES SEGURAS)
         html = f"""
         <div style="font-family:Helvetica, Arial, sans-serif; padding:40px; background:white; color:#333; border:1px solid #ccc;">
             <div style="text-align:center; border-bottom: 2px solid #0277bd; padding-bottom: 10px; margin-bottom: 20px;">
                 <h2 style="color:#0277bd; margin:0;">INFORME DE ESTIMACIÓN DE RECURSOS</h2>
-                <h4 style="margin:5px 0; color:#555;">PROYECTO: {proj_name.upper()}</h4>
+                <h4 style="margin:5px 0; color:#555;">PROYECTO: {safe_proj_name.upper()}</h4>
             </div>
             
             <table style="width:100%; margin-bottom: 20px;">
@@ -1135,8 +1134,7 @@ with tabs[6]:
                 </ul>
             </div>
             
-            <h3 style="color:#0277bd; border-bottom:1px solid #eee; margin-top:20px;">2. MEMORIA DE CÁLCULO (TRAZABILIDAD)</h3>
-            <p style="font-size:0.9em; color:#666;">Se procesaron un total de {len(df_safe)} muestras para esta estimación.</p>
+            <h3 style="color:#0277bd; border-bottom:1px solid #eee; margin-top:20px;">2. MEMORIA DE CÁLCULO ({len(df_safe)} Muestras)</h3>
             <table style="width:100%; border-collapse: collapse; font-size: 0.9em;">
                 <tr style="background-color:#0277bd; color:white; text-align:left;">
                     <th style="padding: 8px;">ID Muestra</th>
@@ -1161,7 +1159,8 @@ with tabs[6]:
         
         # Botón de Descarga
         b64 = base64.b64encode(html.encode()).decode()
-        href = f'<a href="data:text/html;base64,{b64}" download="Informe_Tecnico_{proj_name}.html" style="text-decoration:none;">' \
+        safe_filename = f"Reporte_{safe_proj_name.replace(' ', '_')}.html"
+        href = f'<a href="data:text/html;base64,{b64}" download="{safe_filename}" style="text-decoration:none;">' \
                f'<button style="background-color:#2e7d32; color:white; padding:12px 24px; border:none; border-radius:4px; cursor:pointer; font-weight:bold; font-size:16px;">' \
                f'📥 DESCARGAR INFORME OFICIAL (PDF/HTML)</button></a>'
         st.markdown(href, unsafe_allow_html=True)
