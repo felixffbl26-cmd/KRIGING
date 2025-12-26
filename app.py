@@ -1050,88 +1050,109 @@ with tabs[5]:
         st.info("⚠️ Ejecute primero la estimación.")
 
 # ==============================================================================
-# TAB 7: INFORME (CORREGIDO Y BLINDADO)
+# TAB 7: INFORME (BLINDADO CONTRA TODOS LOS ERRORES)
 # ==============================================================================
 with tabs[6]:
-    if st.session_state['resultado']:
+    # 1. VERIFICACIÓN DE CÁLCULO
+    if st.session_state.get('resultado') is None:
+        st.info("⚠️ Aún no has realizado ninguna estimación. Ve a la Pestaña 3.")
+    
+    else:
         res = st.session_state['resultado']
-        
-        st.markdown("### 📄 Generador de Reporte Técnico")
-        
-        # 1. Lista de estudiantes
-        est_li = "".join([f"<li>{e}</li>" for e in estudiantes_activos])
-        
-        # 2. LÓGICA DE SEGURIDAD (ESTA ES LA CURA AL ERROR)
-        # Calcula el número menor de filas para que nunca se desborde, tengas 6 o 47 datos.
         df_safe = st.session_state['df_data']
         
-        # Aseguramos que las listas tengan el mismo largo antes de iterar
-        limit = min(len(res['pesos']), len(res['d_vec']), len(df_safe))
+        # 2. ESCUDO CONTRA ERROR DE INDICE (IndexError)
+        # Si el usuario cargó 47 datos pero el cálculo viejo tiene 6, DETENEMOS el reporte aquí.
+        if len(df_safe) != len(res['d_vec']):
+            st.error(f"🚨 DESAJUSTE DE DATOS DETECTADO")
+            st.warning(f"Tus datos tienen {len(df_safe)} muestras, pero el cálculo guardado es de {len(res['d_vec'])} muestras.")
+            st.info("👉 SOLUCIÓN: Ve a la **Pestaña 3 (Estimación)** y haz clic en el botón **'🚀 EJECUTAR KRIGING'** para actualizar la memoria.")
+            st.stop() # Detiene la ejecución para evitar la pantalla roja
+
+        # 3. ESCUDO CONTRA ERROR DE NOMBRE (NameError)
+        # Si la variable 'estudiantes_activos' no existe, creamos una por defecto.
+        if 'estudiantes_activos' not in locals() and 'estudiantes_activos' not in globals():
+            estudiantes_activos = ["Equipo Técnico (Nombres no definidos)"]
+
+        st.markdown("### 📄 Generador de Reporte Técnico")
         
-        ids = df_safe['ID'].values
-        leys = df_safe['Ley'].values
+        # Generar lista HTML
+        est_li = "".join([f"<li>{e}</li>" for e in estudiantes_activos])
         
-        # 3. Generación de filas seguras
+        # 4. GENERACIÓN SEGURA DE TABLA
         rows = ""
-        for i in range(limit):
+        # Usamos zip para iterar exactamente sobre lo que existe, doble seguridad
+        for i, (id_val, ley_val) in enumerate(zip(df_safe['ID'], df_safe['Ley'])):
             try:
-                # Extraemos valores con seguridad dentro del límite
-                id_val = str(ids[i])
-                dist_val = float(res['d_vec'][i])
-                peso_val = float(res['pesos'][i])
-                ley_val = float(leys[i])
+                dist = res['d_vec'][i]
+                peso = res['pesos'][i]
                 
                 rows += f"""
                 <tr>
-                    <td>{id_val}</td>
-                    <td>{dist_val:.2f}</td>
-                    <td>{peso_val:.4f}</td>
-                    <td>{ley_val:.2f}</td>
+                    <td style="border: 1px solid #ddd; padding: 8px;">{id_val}</td>
+                    <td style="border: 1px solid #ddd; padding: 8px;">{dist:.2f}</td>
+                    <td style="border: 1px solid #ddd; padding: 8px;">{peso:.4f}</td>
+                    <td style="border: 1px solid #ddd; padding: 8px;">{ley_val:.2f}</td>
                 </tr>"""
-            except:
-                continue
+            except IndexError:
+                continue # Si algo falla en una fila, la saltamos
 
-        # 4. El HTML del Reporte
+        # HTML del Reporte
         html = f"""
-        <div style="font-family:Arial; padding:40px; background:white; color:black; border:1px solid #ccc;">
-            <center>
-                <h1 style="color:#0277bd;">INFORME DE ESTIMACIÓN DE RECURSOS</h1>
-                <h3>PROYECTO: {proj_name.upper()}</h3>
-            </center>
-            <hr>
-            <table width="100%">
+        <div style="font-family:Helvetica, Arial, sans-serif; padding:40px; background:white; color:#333; border:1px solid #ccc;">
+            <div style="text-align:center; border-bottom: 2px solid #0277bd; padding-bottom: 10px; margin-bottom: 20px;">
+                <h2 style="color:#0277bd; margin:0;">INFORME DE ESTIMACIÓN DE RECURSOS</h2>
+                <h4 style="margin:5px 0; color:#555;">PROYECTO: {proj_name.upper()}</h4>
+            </div>
+            
+            <table style="width:100%; margin-bottom: 20px;">
                 <tr>
-                    <td><b>Docente:</b> Ing. Arturo R. Chayña Rodriguez</td>
-                    <td align="right"><b>Fecha:</b> {datetime.now().strftime('%d/%m/%Y')}</td>
+                    <td><b>Docente Supervisor:</b><br>Ing. Arturo R. Chayña Rodriguez</td>
+                    <td style="text-align:right;"><b>Fecha de Emisión:</b><br>{datetime.now().strftime('%d/%m/%Y')}</td>
                 </tr>
-                <tr><td colspan="2"><b>Equipo Técnico:</b><ul>{est_li}</ul></td></tr>
+                <tr>
+                    <td colspan="2" style="padding-top:10px;"><b>Equipo de Ingeniería:</b>
+                        <ul style="margin-top:5px; padding-left:20px;">{est_li}</ul>
+                    </td>
+                </tr>
             </table>
             
-            <h3>1. RESUMEN EJECUTIVO</h3>
-            <div style="background:#e3f2fd; padding:15px; border-radius:5px;">
-                <p>Estimación del Bloque en <b>X={res['tx']:.2f}, Y={res['ty']:.2f}</b>:</p>
-                <ul>
-                    <li><b>LEY ESTIMADA: {res['ley']:.4f} % Cu</b></li>
-                    <li>Varianza Kriging: {res['var']:.4f}</li>
-                    <li>Categoría: <b>{res['cat']}</b></li>
+            <h3 style="color:#0277bd; border-bottom:1px solid #eee;">1. RESUMEN EJECUTIVO</h3>
+            <div style="background-color:#e1f5fe; padding:15px; border-radius:5px; border-left: 5px solid #0277bd;">
+                <p style="margin:0;">Certificación de estimación para el bloque centrado en <b>X={res['tx']:.2f}, Y={res['ty']:.2f}</b>.</p>
+                <ul style="margin-top:10px;">
+                    <li><b>LEY ESTIMADA (Z*):</b> {res['ley']:.4f} %</li>
+                    <li><b>Varianza Kriging:</b> {res['var']:.4f}</li>
+                    <li><b>Categoría JORC:</b> {res['cat']}</li>
                 </ul>
             </div>
             
-            <h3>2. DETALLE DE MUESTRAS ({limit} registros procesados)</h3>
-            <table border="1" cellspacing="0" cellpadding="5" width="100%">
-                <tr style="background:#0277bd; color:white;"><th>ID</th><th>Distancia (m)</th><th>Peso</th><th>Ley</th></tr>
+            <h3 style="color:#0277bd; border-bottom:1px solid #eee; margin-top:20px;">2. MEMORIA DE CÁLCULO (TRAZABILIDAD)</h3>
+            <table style="width:100%; border-collapse: collapse; font-size: 0.9em;">
+                <tr style="background-color:#0277bd; color:white; text-align:left;">
+                    <th style="padding: 8px;">ID Muestra</th>
+                    <th style="padding: 8px;">Distancia (m)</th>
+                    <th style="padding: 8px;">Peso Kriging (λ)</th>
+                    <th style="padding: 8px;">Ley Real (%)</th>
+                </tr>
                 {rows}
             </table>
             
-            <br><br><br>
-            <center>
-                <p>________________________________________________</p>
+            <br><br><br><br>
+            <div style="text-align:center; color:#777;">
+                <p>_________________________________________________</p>
                 <p><b>RESPONSABLE FACULTAD DE INGENIERÍA DE MINAS - UNA PUNO</b></p>
-                <p>Semestre 2025 - II</p>
-            </center>
+                <p style="font-size:0.8em;">Generado automáticamente por Geo-Miner Pro | Semestre 2025-II</p>
+            </div>
         </div>
         """
         
-        st.components.v1.html(html, height=700, scrolling=True)
+        # Renderizar
+        st.components.v1.html(html, height=800, scrolling=True)
+        
+        # Botón de Descarga
         b64 = base64.b64encode(html.encode()).decode()
-        st.markdown(f'<a href="data:text/html;base64,{b64}" download="Reporte_{proj_name}.html"><button style="background-color:#2e7d32; color:white; padding:10px 20px; border:none; border-radius:5px; cursor:pointer;">📥 DESCARGAR INFORME OFICIAL</button></a>', unsafe_allow_html=True)
+        href = f'<a href="data:text/html;base64,{b64}" download="Informe_Tecnico_{proj_name}.html" style="text-decoration:none;">' \
+               f'<button style="background-color:#2e7d32; color:white; padding:12px 24px; border:none; border-radius:4px; cursor:pointer; font-weight:bold; font-size:16px;">' \
+               f'📥 DESCARGAR INFORME OFICIAL (PDF/HTML)</button></a>'
+        st.markdown(href, unsafe_allow_html=True)
