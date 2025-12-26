@@ -1053,49 +1053,57 @@ with tabs[5]:
 # TAB 7: INFORME (BLINDADO CONTRA TODOS LOS ERRORES)
 # ==============================================================================
 with tabs[6]:
-    # 1. VERIFICACIÓN DE CÁLCULO
+    # 1. VERIFICACIÓN DE EXISTENCIA DE RESULTADOS
     if st.session_state.get('resultado') is None:
-        st.info("⚠️ Aún no has realizado ninguna estimación. Ve a la Pestaña 3.")
+        st.info("⚠️ Aún no has realizado ninguna estimación. Ve a la Pestaña 3 y calcula.")
     
     else:
         res = st.session_state['resultado']
         df_safe = st.session_state['df_data']
         
-        # 2. ESCUDO CONTRA ERROR DE INDICE (IndexError)
-        # Si el usuario cargó 47 datos pero el cálculo viejo tiene 6, DETENEMOS el reporte aquí.
+        # 2. ESCUDO CONTRA DESAJUSTE DE DATOS (IndexError)
+        # Si tienes 47 datos en Excel pero el cálculo viejo tenía 6, esto DETIENE el error.
         if len(df_safe) != len(res['d_vec']):
-            st.error(f"🚨 DESAJUSTE DE DATOS DETECTADO")
-            st.warning(f"Tus datos tienen {len(df_safe)} muestras, pero el cálculo guardado es de {len(res['d_vec'])} muestras.")
-            st.info("👉 SOLUCIÓN: Ve a la **Pestaña 3 (Estimación)** y haz clic en el botón **'🚀 EJECUTAR KRIGING'** para actualizar la memoria.")
-            st.stop() # Detiene la ejecución para evitar la pantalla roja
+            st.warning("⚠️ **¡ATENCIÓN!** Has cargado nuevos datos pero no has actualizado el cálculo.")
+            st.error(f"Datos actuales: {len(df_safe)} muestras | Cálculo guardado: {len(res['d_vec'])} muestras.")
+            st.markdown("👉 **SOLUCIÓN:** Ve a la **Pestaña 3 (Estimación)** y haz clic de nuevo en **'🚀 EJECUTAR KRIGING'**.")
+            st.stop() # Detiene la ejecución aquí para que no salga el error rojo feo.
 
-        # 3. ESCUDO CONTRA ERROR DE NOMBRE (NameError)
-        # Si la variable 'estudiantes_activos' no existe, creamos una por defecto.
+        # 3. ESCUDO CONTRA VARIABLES FALTANTES (NameError)
+        # Si la lista de estudiantes se perdió, creamos una genérica.
         if 'estudiantes_activos' not in locals() and 'estudiantes_activos' not in globals():
-            estudiantes_activos = ["Equipo Técnico (Nombres no definidos)"]
+            estudiantes_activos = ["Equipo Técnico (Sin nombres)"]
+
+        # 4. ESCUDO CONTRA NOMBRES DE COLUMNAS (KeyError)
+        # Busca la columna ID sea como sea que se escriba
+        col_id = next((c for c in ['ID', 'Id', 'id', 'Muestra'] if c in df_safe.columns), df_safe.columns[0])
+        col_ley = next((c for c in ['Ley', 'LEY', 'ley', 'Grade'] if c in df_safe.columns), df_safe.columns[-1])
 
         st.markdown("### 📄 Generador de Reporte Técnico")
         
-        # Generar lista HTML
+        # Generar lista HTML de estudiantes
         est_li = "".join([f"<li>{e}</li>" for e in estudiantes_activos])
         
-        # 4. GENERACIÓN SEGURA DE TABLA
+        # 5. GENERACIÓN SEGURA DE LA TABLA
         rows = ""
-        # Usamos zip para iterar exactamente sobre lo que existe, doble seguridad
-        for i, (id_val, ley_val) in enumerate(zip(df_safe['ID'], df_safe['Ley'])):
+        # Usamos iteración segura
+        for i in range(len(df_safe)):
             try:
-                dist = res['d_vec'][i]
-                peso = res['pesos'][i]
+                # Obtenemos valores con seguridad
+                val_id = str(df_safe[col_id].iloc[i])
+                val_ley = float(df_safe[col_ley].iloc[i])
+                val_dist = float(res['d_vec'][i])
+                val_peso = float(res['pesos'][i])
                 
                 rows += f"""
                 <tr>
-                    <td style="border: 1px solid #ddd; padding: 8px;">{id_val}</td>
-                    <td style="border: 1px solid #ddd; padding: 8px;">{dist:.2f}</td>
-                    <td style="border: 1px solid #ddd; padding: 8px;">{peso:.4f}</td>
-                    <td style="border: 1px solid #ddd; padding: 8px;">{ley_val:.2f}</td>
+                    <td style="border: 1px solid #ddd; padding: 8px;">{val_id}</td>
+                    <td style="border: 1px solid #ddd; padding: 8px;">{val_dist:.2f}</td>
+                    <td style="border: 1px solid #ddd; padding: 8px;">{val_peso:.4f}</td>
+                    <td style="border: 1px solid #ddd; padding: 8px;">{val_ley:.2f}</td>
                 </tr>"""
-            except IndexError:
-                continue # Si algo falla en una fila, la saltamos
+            except Exception:
+                continue # Si una fila falla, la ignora y sigue
 
         # HTML del Reporte
         html = f"""
@@ -1128,6 +1136,7 @@ with tabs[6]:
             </div>
             
             <h3 style="color:#0277bd; border-bottom:1px solid #eee; margin-top:20px;">2. MEMORIA DE CÁLCULO (TRAZABILIDAD)</h3>
+            <p style="font-size:0.9em; color:#666;">Se procesaron un total de {len(df_safe)} muestras para esta estimación.</p>
             <table style="width:100%; border-collapse: collapse; font-size: 0.9em;">
                 <tr style="background-color:#0277bd; color:white; text-align:left;">
                     <th style="padding: 8px;">ID Muestra</th>
