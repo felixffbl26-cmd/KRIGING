@@ -1548,7 +1548,7 @@ with tabs[3]:
             return f'color: {color}; font-weight: bold'
             
         # CORRECCIÓN: Aplicamos el formato de 4 decimales SOLO a las columnas numéricas
-        st.dataframe(df_final_weights.style.applymap(highlight_neg, subset=['Peso Kriging (λ)']).format(
+        st.dataframe(df_final_weights.style.map(highlight_neg, subset=['Peso Kriging (λ)']).format(
             subset=['Ley Real (Z)', 'Peso Kriging (λ)', 'Aporte (λ * Z)'], 
             formatter="{:.4f}"
         ))
