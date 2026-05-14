@@ -2030,7 +2030,7 @@ with tabs[4]:
             
             # Mostrar tabla con formato
             st.dataframe(
-                df_sens_2d.style.applymap(color_cells).format("${:,.0f}"),
+                df_sens_2d.style.map(color_cells).format("${:,.0f}"),
                 use_container_width=True
             )
             
